@@ -1,4 +1,4 @@
-# app/clip_selector.py
+cat > app/clip_selector.py << 'EOF'
 from moviepy.editor import VideoFileClip
 from .utils import transcribe_video
 import re
@@ -21,7 +21,7 @@ def select_clips(
     matches = []
     for seg in segments:
         for kw in keywords:
-            if re.search(rf"\b{re.escape(kw)}\b", seg["text"], flags=re.IGNORECASE):
+            if re.search(rf"\\b{re.escape(kw)}\\b", seg["text"], flags=re.IGNORECASE):
                 matches.append(seg["start"])
                 break
     timestamps = sorted(set(matches))
@@ -47,4 +47,4 @@ def select_clips(
     video.close()
 
     return clip_paths
-    
+EOF
