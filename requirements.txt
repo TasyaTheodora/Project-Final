@@ -1,3 +1,0 @@
-moviepy
-openai-whisper
-streamlit
