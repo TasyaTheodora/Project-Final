@@ -1,13 +1,23 @@
-
+# file: app/ui.py
 import streamlit as st
 import tempfile
+import random
 from moviepy.video.io.VideoFileClip import VideoFileClip
+
 # —————— CONFIG HALAMAN ——————
 st.set_page_config(
-    page_title="Video Trimmer",
+    page_title="Video Trimmer & Viral Score",
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+# —————— FUNCTION VIRAL SCORE ——————
+def compute_viral_score(video_path: str) -> int:
+    """
+    Stub fungsi untuk menghitung tingkat keviralan video.
+    Saat ini menghasilkan skor acak 0-100.
+    """
+    return random.randint(0, 100)
 
 # —————— SIDEBAR NAVIGASI ——————
 st.sidebar.header("📋 Navigasi")
@@ -16,17 +26,18 @@ menu = st.sidebar.radio("Pilih halaman:", ["Home", "Video Editor", "Tentang"])
 # —————— HALAMAN HOME ——————
 if menu == "Home":
     st.title("🚀 Selamat Datang")
-    st.write("Gunakan menu **Video Editor** untuk memotong video Anda.")
+    st.write("Gunakan menu **Video Editor** untuk memotong video dan melihat skor keviralan.")
 
 # —————— HALAMAN VIDEO EDITOR ——————
 elif menu == "Video Editor":
-    st.title("✂️ Video Trimmer")
-    st.write("Unggah video Anda, lalu atur titik potongnya.")
+    st.title("✂️ Video Trimmer & Viral Score")
+    st.write("Unggah video Anda, atur titik potong, dan dapatkan perkiraan skor keviralan.")
 
     uploaded = st.file_uploader("Pilih file video:", type=["mp4", "mov", "avi"])
     if uploaded:
         # simpan sementara agar moviepy bisa membacanya
-        tfile = tempfile.NamedTemporaryFile(suffix="." + uploaded.type.split("/")[-1], delete=False)
+        suffix = uploaded.name.split('.')[-1]
+        tfile = tempfile.NamedTemporaryFile(suffix=f".{suffix}", delete=False)
         tfile.write(uploaded.read())
         tfile.flush()
 
@@ -48,7 +59,8 @@ elif menu == "Video Editor":
             else:
                 with st.spinner("Memproses potongan…"):
                     subclip = clip.subclip(start, end)
-                    out_path = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False).name
+                    out_file = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
+                    out_path = out_file.name
                     # tulis file potongan
                     subclip.write_videofile(
                         out_path,
@@ -58,16 +70,30 @@ elif menu == "Video Editor":
                         logger=None
                     )
                 st.success("Selesai memotong!")
-                st.subheader("Hasil Potongan")
+
+                # Hitung viral score
+                score = compute_viral_score(out_path)
+                st.metric(label="Tingkat Keviralan (0-100)", value=f"{score}")
+
+                st.subheader("Preview Hasil Potongan")
                 st.video(out_path)
+
+                # Tombol download
+                with open(out_path, "rb") as f:
+                    video_bytes = f.read()
+                st.download_button(
+                    label="⬇️ Download Video Potongan",
+                    data=video_bytes,
+                    file_name="clip_potongan.mp4",
+                    mime="video/mp4"
+                )
 
 # —————— HALAMAN TENTANG ——————
 else:
     st.title("ℹ️ Tentang Aplikasi")
     st.write("""
-        Aplikasi ini dibuat untuk memotong video secara cepat langsung di browser menggunakan MoviePy & Streamlit.
+        Aplikasi ini dibuat untuk memotong video secara cepat langsung di browser menggunakan MoviePy & Streamlit, dilengkapi estimasi skor keviralan.
         
-        **Penulis:** Nama Anda  
-        **Versi:** 1.0  
+        **Penulis:** Anastasia Theodora  
+        **Versi:** 1.1  
     """)
-
