@@ -2,7 +2,7 @@
 import streamlit as st
 import tempfile
 import random
-from moviepy.video.io.VideoFileClip import VideoFileClip
+from moviepy.editor import VideoFileClip
 
 # —————— CONFIG HALAMAN ——————
 st.set_page_config(
@@ -94,6 +94,7 @@ else:
     st.write("""
         Aplikasi ini dibuat untuk memotong video secara cepat langsung di browser menggunakan MoviePy & Streamlit, dilengkapi estimasi skor keviralan.
         
-        **Penulis:** Anastasia Theodora  
+        **Penulis:** Anastasia Theodora
+        **GitHub:** [github.com/TasyaTheodora]
         **Versi:** 1.1  
     """)
