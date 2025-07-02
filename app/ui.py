@@ -1,10 +1,12 @@
 # file: app/ui.py
-# file: app/ui.py
+import os, sys
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+
 import streamlit as st
 import tempfile
 
 # import fungsi transkripsi dan virality
-from app.utils import transcribe_video, estimate_virality
+from utils import transcribe_video, estimate_virality
 
 # import moviepy
 from moviepy.editor import VideoFileClip
