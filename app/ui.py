@@ -1,8 +1,11 @@
 # File: app/ui.py
-import os
 import streamlit as st
 import tempfile
+
+# import MoviePy
 from moviepy.editor import VideoFileClip
+
+# import helper functions
 from app.utils import transcribe_video, estimate_virality
 
 st.set_page_config(
