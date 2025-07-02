@@ -1,13 +1,10 @@
 import whisper
 
-def transcribe_video(video_path: str, verbose: bool = True) -> dict:
+# load once at import time for speed
+_model = whisper.load_model("base")
+
+def transcribe_video(video_path: str, verbose: bool = False) -> dict:
     """
-    Mengubah video menjadi hasil transkripsi Whisper.
-    - video_path: path ke file video
-    - verbose: False untuk sembunyikan progress bar
-    Returns: dict hasil transkripsi lengkap dengan segments.
+    Transcribe a video file locally with Whisper.
     """
-    model = whisper.load_model("base")
-    # pass verbose flag into Whisper
-    result = model.transcribe(video_path, verbose=verbose)
-    return result
+    return _model.transcribe(video_path, verbose=verbose)
