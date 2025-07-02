@@ -88,6 +88,6 @@ else:
     st.write("""
     Aplikasi ini memotong video langsung di browser, lalu menganalisis potensi viral-nya menggunakan AI.
 
-    **Penulis:** Nama Anda  
+    **Penulis:** Anastasia Theodora
     **Versi:** 1.1
     """)
