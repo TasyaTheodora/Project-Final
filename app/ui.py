@@ -1,8 +1,7 @@
-# file: app/ui.py
+
 import streamlit as st
 import tempfile
-from moviepy.editor import VideoFileClip
-
+from moviepy.video.io.VideoFileClip import VideoFileClip
 # —————— CONFIG HALAMAN ——————
 st.set_page_config(
     page_title="Video Trimmer",
