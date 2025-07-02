@@ -1,5 +1,5 @@
 streamlit==1.46.1
 moviepy==2.2.1
-# biarkan imageio-ffmpeg fleksibel supaya Cloud bisa menemukan versi yang cocok
+# versi imageio-ffmpeg harus >=0.6.0 pada Python 3.13
 imageio-ffmpeg>=0.6.0
 openai>=0.27.0
