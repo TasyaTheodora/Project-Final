@@ -1,11 +1,13 @@
-# file: app/ui.py
 import os
 import streamlit as st
 import tempfile
-import subprocess
-import imageio_ffmpeg as ffmpeg  # pip install imageio-ffmpeg>=0.6.0,<0.7.0
 
+# import fungsi transkripsi & virality dari utils
 from app.utils import transcribe_video, estimate_virality
+
+# import MoviePy
+from moviepy.editor import VideoFileClip
+
 
 # —————— CONFIG HALAMAN ——————
 st.set_page_config(
