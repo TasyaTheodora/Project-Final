@@ -2,3 +2,5 @@ streamlit==1.46.1
 moviepy==2.2.1
 imageio-ffmpeg>=0.6.0,<0.7.0
 openai==0.27.0
+pydub==0.25.1
+pandas==2.1.3       
