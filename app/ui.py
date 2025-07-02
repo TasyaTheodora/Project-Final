@@ -6,7 +6,7 @@ import tempfile
 from app.utils import transcribe_video, estimate_virality
 
 # import MoviePy
-from moviepy.editor import VideoFileClip
+from moviepy.video.io.VideoFileClip import VideoFileClip
 
 
 # —————— CONFIG HALAMAN ——————
