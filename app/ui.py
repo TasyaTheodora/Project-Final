@@ -1,17 +1,13 @@
 # file: app/ui.py
-import os
+# file: app/ui.py
 import streamlit as st
 import tempfile
 
 # import fungsi transkripsi dan virality
-from .utils import transcribe_video, estimate_virality
+from app.utils import transcribe_video, estimate_virality
 
-# import moviepy, sesuaikan path
-try:
-    from moviepy.editor import VideoFileClip
-except ImportError:
-    from moviepy.video.io.VideoFileClip import VideoFileClip
-
+# import moviepy
+from moviepy.editor import VideoFileClip
 
 # ----- CONFIG HALAMAN -----
 st.set_page_config(
