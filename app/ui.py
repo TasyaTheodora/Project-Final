@@ -6,8 +6,7 @@ import streamlit as st
 import tempfile
 
 # import fungsi transkripsi dan virality
-from utils import transcribe_video, estimate_virality
-
+from app.utils import transcribe_video, estimate_virality
 # import moviepy
 from moviepy.editor import VideoFileClip
 
