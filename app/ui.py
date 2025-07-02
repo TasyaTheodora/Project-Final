@@ -1,11 +1,9 @@
 # file: app/ui.py
-
 import os
 import tempfile
 import streamlit as st
-from utils import transcribe_video, estimate_virality
+from app.utils import transcribe_video, estimate_virality
 from moviepy.editor import VideoFileClip
-
 # … (rest of your ui.py seperti patch sebelumnya) …
 
 
