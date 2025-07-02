@@ -1,13 +1,13 @@
 # file: app/ui.py
+
 import os
 import tempfile
 import streamlit as st
-
-# import fungsi transkripsi & virality dari utils.py
 from utils import transcribe_video, estimate_virality
-
-# import MoviePy
 from moviepy.editor import VideoFileClip
+
+# … (rest of your ui.py seperti patch sebelumnya) …
+
 
 # —————— CONFIG HALAMAN ——————
 st.set_page_config(
