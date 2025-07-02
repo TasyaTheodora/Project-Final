@@ -1,10 +1,35 @@
-import whisper
+### File: app/utils.py
+import os
+import re
+import openai
 
-# load once at import time for speed
-_model = whisper.load_model("base")
+# Pastikan OPENAI_API_KEY Anda sudah di-set pada environment
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
-def transcribe_video(video_path: str, verbose: bool = False) -> dict:
+
+def estimate_virality(transcript: str) -> float:
     """
-    Transcribe a video file locally with Whisper.
+    Menggunakan OpenAI untuk memperkirakan seberapa viral konten berdasar transkrip.
+    Mengembalikan skor 0.0 - 100.0
     """
-    return _model.transcribe(video_path, verbose=verbose)
+    prompt = (
+        "Rate the viral potential of the following video transcript on a scale of 0 to 100, "
+        "where 0 is not viral at all and 100 is extremely viral:\n\n" + transcript
+    )
+    try:
+        resp = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "You are an assistant that rates video transcripts for viral potential."},
+                {"role": "user",   "content": prompt}
+            ],
+            temperature=0.0,
+            max_tokens=16
+        )
+        text = resp.choices[0].message.content.strip()
+        # ambil angka pertama yang muncul
+        match = re.search(r"\d+\.?\d*", text)
+        return float(match.group()) if match else 0.0
+    except Exception as e:
+        print("Error estimating virality:", e)
+        return 0.0
