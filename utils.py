@@ -1,31 +1,29 @@
-# file: app/utils.py
-import os
-import re
-import openai
+# file: utils.py
+import os, re, openai
 
-# Pastikan OPENAI_API_KEY sudah di-set di environment
+# baca API key dari env
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 def transcribe_video(video_path: str, verbose: bool = False) -> dict:
     """
-    Transkrip audio dari video menggunakan OpenAI Whisper API.
-    Kembalikan {"text": ..., "segments": [...]}
+    Transkrip audio video pakai Whisper. 
+    Return {"text":..., "segments":[...]}.
     """
     with open(video_path, "rb") as f:
-        result = openai.Audio.transcribe("whisper-1", f)
-    text = result.get("text", "")
-    segments = result.get("segments", [{"start":0.0,"end":0.0,"text":text}])
+        res = openai.Audio.transcribe("whisper-1", f)
+    text = res.get("text", "")
+    segments = res.get("segments", [{"start":0.0,"end":0.0,"text":text}])
     if verbose:
         print("↪ Transcript:", text)
     return {"text": text, "segments": segments}
 
 def estimate_virality(transcript: str) -> float:
     """
-    Minta skor viral (0–100) via ChatCompletion.
+    Minta ChatCompletion untuk scoring viral 0–100.
     """
     prompt = (
-        "Rate the viral potential of the following video transcript on a scale of 0 to 100,\n"
-        "where 0 is not viral at all and 100 is extremely viral:\n\n"
+        "Rate the viral potential of the following video transcript on a scale of 0 to 100\n"
+        "where 0 means not viral at all and 100 means extremely viral:\n\n"
         + transcript
     )
     resp = openai.ChatCompletion.create(

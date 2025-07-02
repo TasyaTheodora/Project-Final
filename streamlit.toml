@@ -1,3 +1,6 @@
-[global]
-# Tentukan file utama aplikasi Streamlit
-app_file = "app/ui.py"
+[server]
+headless = true
+enableCORS = false
+
+[run]
+main = "ui.py"

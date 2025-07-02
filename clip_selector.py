@@ -1,7 +1,7 @@
 # file: app/clip_selector.py
 from moviepy.editor import VideoFileClip
-from utils import transcribe_video
 import re, os
+from utils import transcribe_video
 
 def select_clips(video_path: str, keywords: list[str], clip_duration: int = 30) -> list[str]:
     """
