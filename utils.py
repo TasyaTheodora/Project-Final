@@ -1,4 +1,3 @@
-```python
 # file: utils.py
 import os
 import re
@@ -6,7 +5,6 @@ from openai import OpenAI
 
 # Inisialisasi client OpenAI (baca API key dari env var OPENAI_API_KEY)
 client = OpenAI()
-
 
 def transcribe_video(video_path: str, verbose: bool = False) -> dict:
     """
