@@ -91,3 +91,4 @@ with st.expander("ℹ️ Tentang Aplikasi"):
     )
     st.write("**Penulis:** Anastasia Theodora")
     st.write("**Versi:** 1.1")
+
