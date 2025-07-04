@@ -3,10 +3,7 @@ import os
 import tempfile
 import streamlit as st
 import pandas as pd
-
-# Configure ffmpeg path (adjust to where you extracted ffmpeg)
-# e.g. C:\Users\willi\Downloads\ffmpeg-7.1.1\bin\ffmpeg.exe
-os.environ["IMAGEIO_FFMPEG_EXE"] = r"C:\Users\willi\Downloads\ffmpeg-7.1.1\bin\ffmpeg.exe"
+import warnings
 
 from moviepy.video.io.VideoFileClip import VideoFileClip
 from utils import transcribe_video, estimate_virality
@@ -35,9 +32,14 @@ if uploaded:
     st.subheader("▶️ Preview Video Asli")
     st.video(tfile.name)
 
-    # Transcribe offline dan dapatkan segmen
-    with st.spinner("Mentranskrip video secara offline…"):
-        result = transcribe_video(tfile.name)
+    # Transcribe with offline or API
+    try:
+        with st.spinner("Mentranskrip video…"):
+            result = transcribe_video(tfile.name)
+    except Exception as e:
+        st.error(f"Gagal mentranskrip video: {e}")
+        st.stop()
+
     segments = result.get("segments", [])
     full_text = result.get("text", "")
 
@@ -59,40 +61,45 @@ if uploaded:
     end = start + duration
 
     if st.button("Potong Video ✂️"):
-        with st.spinner("Memproses klip…"):
-            clip = VideoFileClip(tfile.name)
-            sub = clip.subclip(start, end)
-            ofile = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4").name
-            sub.write_videofile(
-                ofile,
-                codec="libx264",
-                audio_codec="aac",
-                verbose=False,
-                logger=None
+        try:
+            with st.spinner("Memproses klip…"):
+                clip = VideoFileClip(tfile.name)
+                sub = clip.subclip(start, end)
+                ofile = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4").name
+                sub.write_videofile(
+                    ofile,
+                    codec="libx264",
+                    audio_codec="aac",
+                    verbose=False,
+                    logger=None
+                )
+
+            st.subheader("▶️ Preview Klip")
+            st.video(ofile)
+
+            with open(ofile, "rb") as f:
+                video_bytes = f.read()
+            st.download_button(
+                "⬇️ Unduh Klip", video_bytes,
+                file_name=f"clip_{int(start)}_{int(end)}.mp4",
+                mime="video/mp4"
             )
 
-        st.subheader("▶️ Preview Klip")
-        st.video(ofile)
+            # Tampilkan skor viral
+            score = estimate_virality(full_text)
+            st.metric("🔥 Skor Viral", f"{score:.1f}/100")
 
-        with open(ofile, "rb") as f:
-            video_bytes = f.read()
-        st.download_button(
-            "⬇️ Unduh Klip", video_bytes,
-            file_name=f"clip_{int(start)}_{int(end)}.mp4",
-            mime="video/mp4"
-        )
+        except Exception as e:
+            st.error(f"Gagal memproses klip: {e}")
 
-        # Tampilkan skor viral
-        score = estimate_virality(full_text)
-        st.metric("🔥 Skor Viral", f"{score:.1f}/100")
 else:
     st.info("Unggah video untuk memulai analisis dan pemotongan.")
 
 # ------ TENTANG APLIKASI ------
 with st.expander("ℹ️ Tentang Aplikasi"):
     st.write(
-        "Aplikasi ini memotong video berbasis transkripsi offline menggunakan Whisper + MoviePy,"
+        "Aplikasi ini memotong video berbasis transkripsi menggunakan Whisper lokal atau OpenAI API,"
         " dan menilai potensi viralnya dengan algoritma sederhana."
     )
     st.write("**Penulis:** Anastasia Theodora")
-    st.write("**Versi:** 1.2")
+    st.write("**Versi:** 1.3")
