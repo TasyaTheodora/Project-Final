@@ -5,7 +5,7 @@ import streamlit as st
 import pandas as pd
 import warnings
 
-from moviepy.editor import VideoFileClip
+from moviepy.video.io.VideoFileClip import VideoFileClip
 from utils import transcribe_video, estimate_virality
 
 # ------ CONFIG HALAMAN ------
