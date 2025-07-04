@@ -3,6 +3,11 @@ import os
 import tempfile
 import streamlit as st
 import pandas as pd
+
+# Configure ffmpeg path (adjust to where you extracted ffmpeg)
+# e.g. C:\Users\willi\Downloads\ffmpeg-7.1.1\bin\ffmpeg.exe
+os.environ["IMAGEIO_FFMPEG_EXE"] = r"C:\Users\willi\Downloads\ffmpeg-7.1.1\bin\ffmpeg.exe"
+
 from moviepy.video.io.VideoFileClip import VideoFileClip
 from utils import transcribe_video, estimate_virality
 
@@ -58,7 +63,13 @@ if uploaded:
             clip = VideoFileClip(tfile.name)
             sub = clip.subclip(start, end)
             ofile = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4").name
-            sub.write_videofile(ofile, codec="libx264", audio_codec="aac", verbose=False, logger=None)
+            sub.write_videofile(
+                ofile,
+                codec="libx264",
+                audio_codec="aac",
+                verbose=False,
+                logger=None
+            )
 
         st.subheader("▶️ Preview Klip")
         st.video(ofile)
