@@ -14,81 +14,74 @@ st.set_page_config(
 )
 
 st.title("✂️ Video Trimmer")
-st.write("Unggah video Anda, lalu atur titik potongnya, lihat skor viral, dan unduh klipnya.")
+st.write("Unggah video Anda, kemudian pilih segmen, lihat skor viral, dan unduh klipnya.")
 
+# Upload video
 uploaded = st.file_uploader(
-    "Pilih file video:", type=["mp4", "mov", "avi", "mpeg4"], accept_multiple_files=False
+    "Pilih file video:", type=["mp4", "mov", "avi", "mpeg4"]
 )
 
 if uploaded:
-    # Simpan file ke temp
     suffix = os.path.splitext(uploaded.name)[1]
     tfile = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
     tfile.write(uploaded.read())
     tfile.flush()
 
-    # Preview asli
     st.subheader("▶️ Preview Video Asli")
     st.video(tfile.name)
 
-    # Transkrip dan dapatkan segments
-    with st.spinner("Mentranskrip video..."):
-        result = transcribe_video(tfile.name, verbose=False)
+    # Transcribe offline dan dapatkan segmen
+    with st.spinner("Mentranskrip video secara offline…"):
+        result = transcribe_video(tfile.name)
     segments = result.get("segments", [])
+    full_text = result.get("text", "")
 
     if segments:
-        # Tampilkan tabel segmen
-        st.subheader("📄 Segmen Transkrip")
+        st.subheader("📄 Daftar Segmen Transkrip")
         df = pd.DataFrame([
-            {"Index": i, "Start": seg["start"], "Text": seg["text"]}
+            {"Index": i, "Start (s)": seg["start"], "Teks": seg["text"]}
             for i, seg in enumerate(segments)
         ])
         st.dataframe(df, use_container_width=True)
 
-        # Pilih segmen untuk klip
-        choice = st.selectbox("Pilih segmen yang ingin dipotong:", df["Index"])
-        start = float(df.loc[df.Index == choice, "Start"].values[0])
+        choice = st.selectbox("Pilih segmen untuk dipotong:", df["Index"])
+        start = float(df.loc[df.Index == choice, "Start (s)"].values[0])
     else:
-        st.warning("Tidak ada segmen transkrip; gunakan slider manual.")
+        st.warning("Transkripsi tidak menghasilkan segmen. Gunakan slider manual.")
         start = 0.0
 
-    # Atur durasi klip
     duration = st.slider("Durasi klip (detik)", min_value=1, max_value=60, value=30)
     end = start + duration
 
-    # Tombol potong
     if st.button("Potong Video ✂️"):
-        with st.spinner("Memotong dan memproses klip..."):
+        with st.spinner("Memproses klip…"):
             clip = VideoFileClip(tfile.name)
             sub = clip.subclip(start, end)
-            # simpan klip ke temp
             ofile = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4").name
             sub.write_videofile(ofile, codec="libx264", audio_codec="aac", verbose=False, logger=None)
 
-        # Preview klip
         st.subheader("▶️ Preview Klip")
         st.video(ofile)
 
-        # Download button
         with open(ofile, "rb") as f:
-            data = f.read()
+            video_bytes = f.read()
         st.download_button(
-            "⬇️ Unduh Klip", data=data, file_name="clip_potongan.mp4", mime="video/mp4"
+            "⬇️ Unduh Klip", video_bytes,
+            file_name=f"clip_{int(start)}_{int(end)}.mp4",
+            mime="video/mp4"
         )
 
         # Tampilkan skor viral
-        transcript = result.get("text", "")
-        score = estimate_virality(transcript)
-        st.metric(label="🔥 Skor Viral", value=f"{score:.1f}/100")
+        score = estimate_virality(full_text)
+        st.metric("🔥 Skor Viral", f"{score:.1f}/100")
 else:
-    st.info("Silakan unggah video untuk memulai.")
+    st.info("Unggah video untuk memulai analisis dan pemotongan.")
 
-# ------ HALAMAN TENTANG ------
-
+# ------ TENTANG APLIKASI ------
 with st.expander("ℹ️ Tentang Aplikasi"):
     st.write(
-        "Aplikasi ini dibuat untuk memotong video secara cepat langsung di browser menggunakan MoviePy & Streamlit."
+        "Aplikasi ini memotong video berbasis transkripsi offline menggunakan Whisper + MoviePy,"
+        " dan menilai potensi viralnya dengan algoritma sederhana."
     )
     st.write("**Penulis:** Anastasia Theodora")
-    st.write("**Versi:** 1.1")
-
+    st.write("**Versi:** 1.2")
