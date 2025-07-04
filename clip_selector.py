@@ -1,5 +1,5 @@
 # file: app/clip_selector.py
-from moviepy.editor import VideoFileClip
+from moviepy.video.io.VideoFileClip import VideoFileClip
 import re, os
 from utils import transcribe_video
 

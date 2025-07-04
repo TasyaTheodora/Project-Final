@@ -1,87 +1,93 @@
+# file: ui.py
 import os
-import streamlit as st
 import tempfile
-from utils import transcribe_video, estimate_virality
-# untuk MoviePy v2.x import lewat path video.io
+import streamlit as st
+import pandas as pd
 from moviepy.video.io.VideoFileClip import VideoFileClip
+from utils import transcribe_video, estimate_virality
 
-
-# —————— CONFIG HALAMAN ——————
+# ------ CONFIG HALAMAN ------
 st.set_page_config(
     page_title="Video Trimmer",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# —————— SIDEBAR NAVIGASI ——————
-st.sidebar.header("📋 Navigasi")
-menu = st.sidebar.radio("Pilih halaman:", ["Home", "Video Editor", "Tentang"])
+st.title("✂️ Video Trimmer")
+st.write("Unggah video Anda, lalu atur titik potongnya, lihat skor viral, dan unduh klipnya.")
 
-# —————— HALAMAN HOME ——————
-if menu == "Home":
-    st.title("🚀 Selamat Datang")
-    st.write("Gunakan menu **Video Editor** untuk memotong video Anda.")
+uploaded = st.file_uploader(
+    "Pilih file video:", type=["mp4", "mov", "avi", "mpeg4"], accept_multiple_files=False
+)
 
-# —————— HALAMAN VIDEO EDITOR ——————
-elif menu == "Video Editor":
-    st.title("✂️ Video Trimmer")
-    st.write("Unggah video Anda, lalu atur titik potongnya.")
+if uploaded:
+    # Simpan file ke temp
+    suffix = os.path.splitext(uploaded.name)[1]
+    tfile = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+    tfile.write(uploaded.read())
+    tfile.flush()
 
-    uploaded = st.file_uploader("Pilih file video:", type=["mp4", "mov", "avi"])
-    if uploaded:
-        # simpan sementara agar MoviePy bisa membacanya
-        suffix = os.path.splitext(uploaded.name)[1]
-        tfile = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
-        tfile.write(uploaded.read())
-        tfile.flush()
+    # Preview asli
+    st.subheader("▶️ Preview Video Asli")
+    st.video(tfile.name)
 
-        # transkripsi + beri skor viralitas
-        result = transcribe_video(tfile.name)
-        transcript = result["text"]
-        viral_score = estimate_virality(transcript)
-        st.metric("Viral Score", f"{viral_score:.1f}/100")
+    # Transkrip dan dapatkan segments
+    with st.spinner("Mentranskrip video..."):
+        result = transcribe_video(tfile.name, verbose=False)
+    segments = result.get("segments", [])
 
-        # load video
-        clip = VideoFileClip(tfile.name)
-        duration = clip.duration
+    if segments:
+        # Tampilkan tabel segmen
+        st.subheader("📄 Segmen Transkrip")
+        df = pd.DataFrame([
+            {"Index": i, "Start": seg["start"], "Text": seg["text"]}
+            for i, seg in enumerate(segments)
+        ])
+        st.dataframe(df, use_container_width=True)
 
-        st.subheader("Preview Video Asli")
-        st.video(tfile.name)
+        # Pilih segmen untuk klip
+        choice = st.selectbox("Pilih segmen yang ingin dipotong:", df["Index"])
+        start = float(df.loc[df.Index == choice, "Start"].values[0])
+    else:
+        st.warning("Tidak ada segmen transkrip; gunakan slider manual.")
+        start = 0.0
 
-        st.subheader("Atur Waktu Potong")
-        start = st.slider("Mulai (detik)", 0.0, duration, 0.0, 0.1)
-        end   = st.slider("Selesai (detik)", 0.0, duration, duration, 0.1)
+    # Atur durasi klip
+    duration = st.slider("Durasi klip (detik)", min_value=1, max_value=60, value=30)
+    end = start + duration
 
-        if st.button("▶️ Potong Video"):
-            if end <= start:
-                st.error("Waktu selesai harus lebih besar dari waktu mulai.")
-            else:
-                with st.spinner("Memproses potongan…"):
-                    subclip = clip.subclip(start, end)
-                    out_path = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False).name
-                    subclip.write_videofile(
-                        out_path, codec="libx264", audio_codec="aac", verbose=False, logger=None
-                    )
-                st.success("Selesai memotong!")
-                st.subheader("Hasil Potongan")
-                st.video(out_path)
-                with open(out_path, "rb") as f:
-                    st.download_button(
-                        "⬇️ Download Potongan",
-                        data=f,
-                        file_name="potongan.mp4",
-                        mime="video/mp4"
-                    )
+    # Tombol potong
+    if st.button("Potong Video ✂️"):
+        with st.spinner("Memotong dan memproses klip..."):
+            clip = VideoFileClip(tfile.name)
+            sub = clip.subclip(start, end)
+            # simpan klip ke temp
+            ofile = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4").name
+            sub.write_videofile(ofile, codec="libx264", audio_codec="aac", verbose=False, logger=None)
 
-# —————— HALAMAN TENTANG ——————
+        # Preview klip
+        st.subheader("▶️ Preview Klip")
+        st.video(ofile)
+
+        # Download button
+        with open(ofile, "rb") as f:
+            data = f.read()
+        st.download_button(
+            "⬇️ Unduh Klip", data=data, file_name="clip_potongan.mp4", mime="video/mp4"
+        )
+
+        # Tampilkan skor viral
+        transcript = result.get("text", "")
+        score = estimate_virality(transcript)
+        st.metric(label="🔥 Skor Viral", value=f"{score:.1f}/100")
 else:
-    st.title("ℹ️ Tentang Aplikasi")
-    st.write(
-        """
-        Aplikasi ini dibuat untuk memotong video secara cepat langsung di browser  
-        menggunakan MoviePy & Streamlit.
+    st.info("Silakan unggah video untuk memulai.")
 
-        **Penulis:** Nama Anda  
-        **Versi:** 1.1  
-        """
+# ------ HALAMAN TENTANG ------
+
+with st.expander("ℹ️ Tentang Aplikasi"):
+    st.write(
+        "Aplikasi ini dibuat untuk memotong video secara cepat langsung di browser menggunakan MoviePy & Streamlit."
     )
+    st.write("**Penulis:** Anastasia Theodora")
+    st.write("**Versi:** 1.1")
