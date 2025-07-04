@@ -3,8 +3,11 @@ import os
 import re
 from openai import OpenAI
 
-# Inisialisasi client OpenAI (baca API key dari env var OPENAI_API_KEY)
-client = OpenAI()
+# either read from env or hard-code
+api_key = os.getenv("OPENAI_API_KEY")  # make sure you set this in your shell
+# api_key = "sk-…your key…"           # or paste it here (not recommended for public repos)
+
+client = OpenAI(api_key=api_key)
 
 def transcribe_video(video_path: str, verbose: bool = False) -> dict:
     """
