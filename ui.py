@@ -1,8 +1,8 @@
-# file: app/ui.py
-import tempfile, os
 import streamlit as st
+import tempfile
 from utils import transcribe_video, estimate_virality
-from moviepy.editor import VideoFileClip
+# untuk MoviePy v2.x import lewat path video.io
+from moviepy.video.io.VideoFileClip import VideoFileClip
 
 
 # —————— CONFIG HALAMAN ——————
