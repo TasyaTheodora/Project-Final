@@ -1,58 +1,52 @@
 # file: utils.py
 import os
+import tempfile
 import re
-from openai import OpenAI
+import whisper
+import warnings
 
-# either read from env or hard-code
-api_key = os.getenv("OPENAI_API_KEY")  # make sure you set this in your shell
-# api_key = "sk-…your key…"           # or paste it here (not recommended for public repos)
+# Muat model Whisper lokal sekali saja
+def load_whisper_model():
+    try:
+        return whisper.load_model("base")
+    except Exception as e:
+        warnings.warn(f"Gagal muat Whisper model: {e}")
+        return None
 
-client = OpenAI(api_key=api_key)
+_whisper_model = load_whisper_model()
 
 def transcribe_video(video_path: str, verbose: bool = False) -> dict:
     """
-    Transkrip audio dari video menggunakan OpenAI Whisper API (v1).
-    Mengembalikan dict dengan key 'text' dan 'segments'.
+    Transkripsi audio dari video menggunakan Whisper lokal.
+    Kembalikan dict dengan 'text' dan 'segments'.
     """
-    with open(video_path, "rb") as f:
-        # Panggil endpoint transcriptions baru
-        resp = client.audio.transcriptions.create(
-            model="whisper-1",
-            file=f,
-            response_format="verbose_json"
-        )
+    if _whisper_model is None:
+        raise RuntimeError("Model Whisper lokal tidak tersedia.")
 
-    if verbose:
-        print("⏳ Transcript:", resp)
+    # Ekstraksi audio ke file WAV sementara
+    temp_audio = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+    temp_audio.close()
+    os.system(f"ffmpeg -y -i \"{video_path}\" -ar 16000 -ac 1 -vn \"{temp_audio.name}\"")
 
-    # Ubah ComplexModel ke dict
-    data = resp.to_dict()
-    text = data.get("text", "")
-    segments = data.get(
-        "segments", [{"start": 0.0, "end": 0.0, "text": text}]
-    )
-
+    # Transkripsi
+    result = _whisper_model.transcribe(temp_audio.name)
+    text = result.get("text", "")
+    segments = []
+    for seg in result.get("segments", []):
+        segments.append({
+            "start": seg["start"],
+            "end": seg["end"],
+            "text": seg["text"].strip()
+        })
     return {"text": text, "segments": segments}
 
-
+# Dummy untuk skor viral
+import random
 def estimate_virality(transcript: str) -> float:
     """
-    Rate viral potential 0–100 dengan ChatCompletion.
+    Perkirakan viralitas konten secara acak sebagai fallback.
     """
-    prompt = (
-        "Rate the viral potential of the following video transcript on a scale of 0 to 100, "
-        "where 0 is not viral at all and 100 is extremely viral:\n\n" + transcript
-    )
-    # Atur parameter sesuai kebutuhan
-    resp = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0
-    )
-    # Ambil skor di pesan assistant
-    content = resp.choices[0].message.content.strip()
-    try:
-        score = float(re.search(r"\d+(?:\.\d+)?", content).group())
-    except Exception:
-        score = 0.0
-    return max(0.0, min(100.0, score))
+    # scoring sederhana: panjang transcript mod 100
+    base = len(transcript) % 100
+    # tambahkan sedikit random
+    return float(min(max(base + random.uniform(-10,10), 0), 100))
