@@ -1,3 +1,4 @@
+```python
 # file: utils.py
 import os
 import re
@@ -54,4 +55,3 @@ def estimate_virality(transcript: str) -> float:
     except Exception:
         score = 0.0
     return max(0.0, min(100.0, score))
-```
