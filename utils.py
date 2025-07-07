@@ -1,52 +1,39 @@
 # file: utils.py
+
 import os
 import tempfile
-import re
+import subprocess
 import whisper
-import warnings
-
-# Muat model Whisper lokal sekali saja
-def load_whisper_model():
-    try:
-        return whisper.load_model("base")
-    except Exception as e:
-        warnings.warn(f"Gagal muat Whisper model: {e}")
-        return None
-
-_whisper_model = load_whisper_model()
 
 def transcribe_video(video_path: str, verbose: bool = False) -> dict:
     """
-    Transkripsi audio dari video menggunakan Whisper lokal.
-    Kembalikan dict dengan 'text' dan 'segments'.
+    Mengekstrak audio dari video, lalu mentranskripsinya dengan Whisper.
     """
-    if _whisper_model is None:
-        raise RuntimeError("Model Whisper lokal tidak tersedia.")
+    # buat temp file untuk wav
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+        audio_path = tmp.name
 
-    # Ekstraksi audio ke file WAV sementara
-    temp_audio = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
-    temp_audio.close()
-    os.system(f"ffmpeg -y -i \"{video_path}\" -ar 16000 -ac 1 -vn \"{temp_audio.name}\"")
+    # panggil ffmpeg untuk extract audio 16kHz mono
+    cmd = [
+        "ffmpeg",
+        "-i", video_path,
+        "-ac", "1",        # mono
+        "-ar", "16000",    # 16 kHz
+        "-vn",             # no video
+        "-y",              # overwrite
+        audio_path
+    ]
+    subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
 
-    # Transkripsi
-    result = _whisper_model.transcribe(temp_audio.name)
-    text = result.get("text", "")
-    segments = []
-    for seg in result.get("segments", []):
-        segments.append({
-            "start": seg["start"],
-            "end": seg["end"],
-            "text": seg["text"].strip()
-        })
-    return {"text": text, "segments": segments}
+    # load model Whisper
+    model = whisper.load_model("base")
+    # transcribe
+    result = model.transcribe(audio_path, verbose=verbose)
 
-# Dummy untuk skor viral
-import random
-def estimate_virality(transcript: str) -> float:
-    """
-    Perkirakan viralitas konten secara acak sebagai fallback.
-    """
-    # scoring sederhana: panjang transcript mod 100
-    base = len(transcript) % 100
-    # tambahkan sedikit random
-    return float(min(max(base + random.uniform(-10,10), 0), 100))
+    # bersihkan file sementara
+    try:
+        os.remove(audio_path)
+    except OSError:
+        pass
+
+    return result
