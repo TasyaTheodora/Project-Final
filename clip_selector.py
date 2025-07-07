@@ -2,7 +2,7 @@
 
 import os
 import re
-from moviepy.video.io.ffmpeg_tools import ffmpeg_extract_subclip
+from moviepy.editor import VideoFileClip
 from utils import transcribe_video  # pastikan utils.py di folder yang sama
 
 def select_clips(video_path: str, keywords: list[str], clip_duration: int = 30) -> list[str]:
