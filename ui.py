@@ -1,101 +1,51 @@
-# file: ui.py
-import os
-import tempfile
-import streamlit as st
+
 import pandas as pd
 import warnings
 
 os.environ["FFMPEG_BINARY"] = r"C:\Users\willi\Projects\video-clip-ai-capstone\ffmpeg\ffmpeg-2025-06-28-git-cfd1f81e7d-full_build\bin\ffmpeg.exe"
-
+import os
+import tempfile
+import streamlit as st
 from moviepy.video.io.VideoFileClip import VideoFileClip
 from utils import transcribe_video, estimate_virality
 
-# ------ CONFIG HALAMAN ------
-st.set_page_config(
-    page_title="Video Trimmer",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
+st.set_page_config(page_title="Video Trimmer", layout="wide")
 
-st.title("✂️ Video Trimmer")
-st.write("Unggah video Anda, kemudian pilih segmen, lihat skor viral, dan unduh klipnya.")
+st.title("✂️ Video Trimmer & Viral Score")
 
-# Upload video
-uploaded = st.file_uploader(
-    "Pilih file video:", type=["mp4", "mov", "avi", "mpeg4"]
-)
-
+uploaded = st.file_uploader("Unggah video (mp4,mov,avi):", type=["mp4","mov","avi"])
 if uploaded:
-    suffix = os.path.splitext(uploaded.name)[1]
-    tfile = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
-    tfile.write(uploaded.read())
-    tfile.flush()
+    # simpan sementara
+    ext = os.path.splitext(uploaded.name)[1]
+    tmp = tempfile.NamedTemporaryFile(suffix=ext, delete=False)
+    tmp.write(uploaded.read())
+    tmp.flush()
+    video_path = tmp.name
 
-    st.subheader("▶️ Preview Video Asli")
-    st.video(tfile.name)
+    # tampil preview
+    st.subheader("Preview Video")
+    st.video(video_path)
 
-    # Transcribe with offline or API
-    try:
-        with st.spinner("Mentranskrip video…"):
-            result = transcribe_video(tfile.name)
-    except Exception as e:
-        st.error(f"Gagal mentranskrip video: {e}")
-        st.stop()
+    # transcribe
+    with st.spinner("Menjalankan transkripsi…"):
+        data = transcribe_video(video_path)
+    st.subheader("Transkrip")
+    st.write(data["text"])
 
-    segments = result.get("segments", [])
-    full_text = result.get("text", "")
+    # estimate virality
+    score = estimate_virality(data["text"])
+    st.metric(label="Viral Score", value=f"{score}/100")
 
-    if segments:
-        st.subheader("📄 Daftar Segmen Transkrip")
-        df = pd.DataFrame([
-            {"Index": i, "Start (s)": seg["start"], "Teks": seg["text"]}
-            for i, seg in enumerate(segments)
-        ])
-        st.dataframe(df, use_container_width=True)
+    # potong berdasarkan segmen
+    st.subheader("Segments")
+    for seg in data["segments"]:
+        if st.button(f"Play {seg['start']:.1f}-{seg['end']:.1f} sec:"):
+            clip = VideoFileClip(video_path).subclip(seg['start'], seg['end'])
+            out = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False).name
+            clip.write_videofile(out, codec="libx264", audio_codec="aac", verbose=False)
+            st.video(out)
+            st.download_button("Download Clip", data=open(out, "rb"), file_name=f"clip_{int(seg['start'])}_{int(seg['end'])}.mp4")
 
-        choice = st.selectbox("Pilih segmen untuk dipotong:", df["Index"])
-        start = float(df.loc[df.Index == choice, "Start (s)"].values[0])
-    else:
-        st.warning("Transkripsi tidak menghasilkan segmen. Gunakan slider manual.")
-        start = 0.0
-
-    duration = st.slider("Durasi klip (detik)", min_value=1, max_value=60, value=30)
-    end = start + duration
-
-    if st.button("Potong Video ✂️"):
-        try:
-            with st.spinner("Memproses klip…"):
-                clip = VideoFileClip(tfile.name)
-                sub = clip.subclip(start, end)
-                ofile = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4").name
-                sub.write_videofile(
-                    ofile,
-                    codec="libx264",
-                    audio_codec="aac",
-                    verbose=False,
-                    logger=None
-                )
-
-            st.subheader("▶️ Preview Klip")
-            st.video(ofile)
-
-            with open(ofile, "rb") as f:
-                video_bytes = f.read()
-            st.download_button(
-                "⬇️ Unduh Klip", video_bytes,
-                file_name=f"clip_{int(start)}_{int(end)}.mp4",
-                mime="video/mp4"
-            )
-
-            # Tampilkan skor viral
-            score = estimate_virality(full_text)
-            st.metric("🔥 Skor Viral", f"{score:.1f}/100")
-
-        except Exception as e:
-            st.error(f"Gagal memproses klip: {e}")
-
-else:
-    st.info("Unggah video untuk memulai analisis dan pemotongan.")
 
 # ------ TENTANG APLIKASI ------
 with st.expander("ℹ️ Tentang Aplikasi"):
