@@ -1,8 +1,12 @@
 # file: ui.py
-
 import os
-import tempfile
 
+# Ganti path di bawah sesuai foldermu:
+os.environ["IMAGEIO_FFMPEG_EXE"] = os.path.abspath(
+    "ffmpeg/ffmpeg-2025-06-28-git-cfd1f81e7d-full_build/bin/ffmpeg.exe"
+)
+
+import tempfile
 import streamlit as st
 from moviepy.video.io.VideoFileClip import VideoFileClip
 from utils import transcribe_video, estimate_virality
