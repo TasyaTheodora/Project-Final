@@ -1,8 +1,3 @@
-
-import pandas as pd
-import warnings
-
-os.environ["FFMPEG_BINARY"] = r"C:\Users\willi\Projects\video-clip-ai-capstone\ffmpeg\ffmpeg-2025-06-28-git-cfd1f81e7d-full_build\bin\ffmpeg.exe"
 import os
 import tempfile
 import streamlit as st
