@@ -5,6 +5,8 @@ import streamlit as st
 import pandas as pd
 import warnings
 
+os.environ["FFMPEG_BINARY"] = r"C:\Users\willi\Projects\video-clip-ai-capstone\ffmpeg\ffmpeg-2025-06-28-git-cfd1f81e7d-full_build\bin\ffmpeg.exe"
+
 from moviepy.video.io.VideoFileClip import VideoFileClip
 from utils import transcribe_video, estimate_virality
 
