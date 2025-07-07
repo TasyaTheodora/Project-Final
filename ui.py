@@ -8,7 +8,7 @@ os.environ["IMAGEIO_FFMPEG_EXE"] = os.path.abspath(
 
 import tempfile
 import streamlit as st
-from moviepy.editor import VideoFileClip
+from moviepy.video.io.VideoFileClip import VideoFileClip
 from utils import transcribe_video, estimate_virality
 
 # ─── CONFIG HALAMAN ───
