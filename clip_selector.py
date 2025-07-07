@@ -1,45 +1,25 @@
 # file: clip_selector.py
-
-import os
-import re
+import os, re
 from moviepy.editor import VideoFileClip
-from utils import transcribe_video  # pastikan utils.py di folder yang sama
+from utils import transcribe_video
 
-def select_clips(video_path: str, keywords: list[str], clip_duration: int = 30) -> list[str]:
-    """
-    Memotong klip berdurasi clip_duration detik
-    di sekitar setiap keyword yang ditemukan.
-    Mengembalikan list path ke klip yang dibuat.
-    """
-
-    # 1. Pastikan folder output ada
+def select_clips(video_path: str, keywords: list[str], clip_duration: int=30) -> list[str]:
     os.makedirs("outputs", exist_ok=True)
-
-    # 2. Transkripsi video dan dapatkan segments
-    print("🕒 Running transcription...")
-    result = transcribe_video(video_path, verbose=False)
-    segments = result.get("segments", [])
-
-    # 3. Cari kata kunci di setiap segment
-    matches: list[tuple[float, float]] = []
-    for seg in segments:
-        text = seg.get("text", "")
+    res = transcribe_video(video_path)
+    matches = []
+    for seg in res["segments"]:
         for kw in keywords:
-            if re.search(rf"\b{re.escape(kw)}\b", text, flags=re.IGNORECASE):
-                # potong di tengah-tengah segmen
+            if re.search(rf"\b{re.escape(kw)}\b", seg["text"], re.IGNORECASE):
                 start = max(seg["start"] - clip_duration/2, 0)
-                end   = start + clip_duration
-                matches.append((start, end))
-                break  # cukup satu match per segmen
+                end = start + clip_duration
+                matches.append((start,end))
+                break
 
-    # 4. Extract subclips via ffmpeg
-    out_paths: list[str] = []
-    for i, (start, end) in enumerate(matches):
-        out_file = os.path.join("outputs", f"clip_{i}.mp4")
-        try:
-            ffmpeg_extract_subclip(video_path, start, end, targetname=out_file)
-            out_paths.append(out_file)
-        except Exception as e:
-            print(f"⚠️ Gagal memproses klip #{i}: {e}")
-
+    out_paths = []
+    for i,(s,e) in enumerate(matches):
+        out = f"outputs/clip_{i}.mp4"
+        clip = VideoFileClip(video_path).subclip(s,e)
+        clip.write_videofile(out, codec="libx264", audio_codec="aac", verbose=False, logger=None)
+        clip.close()
+        out_paths.append(out)
     return out_paths
