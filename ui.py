@@ -1,52 +1,71 @@
+# file: ui.py
+
 import os
 import tempfile
+
 import streamlit as st
 from moviepy.video.io.VideoFileClip import VideoFileClip
 from utils import transcribe_video, estimate_virality
 
-st.set_page_config(page_title="Video Trimmer", layout="wide")
+# ───── CONFIG HALAMAN ─────
+st.set_page_config(
+    page_title="Video Trimmer",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 
-st.title("✂️ Video Trimmer & Viral Score")
+st.title("✂️ Video Trimmer")
+st.write("Unggah video Anda, lalu tentukan kapan dan berapa detik klip yang ingin dipotong.")
 
-uploaded = st.file_uploader("Unggah video (mp4,mov,avi):", type=["mp4","mov","avi"])
-if uploaded:
-    # simpan sementara
-    ext = os.path.splitext(uploaded.name)[1]
-    tmp = tempfile.NamedTemporaryFile(suffix=ext, delete=False)
-    tmp.write(uploaded.read())
-    tmp.flush()
-    video_path = tmp.name
+uploaded = st.file_uploader(
+    "Pilih file video:",
+    type=["mp4", "mov", "avi", "mpeg4"],
+    accept_multiple_files=False,
+)
 
-    # tampil preview
-    st.subheader("Preview Video")
-    st.video(video_path)
+if not uploaded:
+    st.stop()
 
-    # transcribe
-    with st.spinner("Menjalankan transkripsi…"):
-        data = transcribe_video(video_path)
-    st.subheader("Transkrip")
-    st.write(data["text"])
+# simpan upload ke tmp
+tfile = tempfile.NamedTemporaryFile(suffix=os.path.splitext(uploaded.name)[1], delete=False)
+tfile.write(uploaded.getbuffer())
+tfile.flush()
 
-    # estimate virality
-    score = estimate_virality(data["text"])
-    st.metric(label="Viral Score", value=f"{score}/100")
+# tampilkan full video dulu
+st.video(tfile.name)
 
-    # potong berdasarkan segmen
-    st.subheader("Segments")
-    for seg in data["segments"]:
-        if st.button(f"Play {seg['start']:.1f}-{seg['end']:.1f} sec:"):
-            clip = VideoFileClip(video_path).subclip(seg['start'], seg['end'])
-            out = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False).name
-            clip.write_videofile(out, codec="libx264", audio_codec="aac", verbose=False)
-            st.video(out)
-            st.download_button("Download Clip", data=open(out, "rb"), file_name=f"clip_{int(seg['start'])}_{int(seg['end'])}.mp4")
+# ───── INPUT POTONG ─────
+st.markdown("### Atur Klip")
+start_time = st.number_input("Mulai (detik):", min_value=0.0, max_value=3000.0, value=0.0, step=0.5)
+clip_duration = st.slider("Durasi klip (detik):", 1, 300, 30)
 
+if st.button("Potong Video ✂️"):
+    try:
+        # potong
+        clip = VideoFileClip(tfile.name).subclip(start_time, start_time + clip_duration)
+        out_tmp = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
+        clip.write_videofile(out_tmp.name, codec="libx264", audio_codec="aac", verbose=False, logger=None)
+        clip.close()
 
-# ------ TENTANG APLIKASI ------
-with st.expander("ℹ️ Tentang Aplikasi"):
-    st.write(
-        "Aplikasi ini memotong video berbasis transkripsi menggunakan Whisper lokal atau OpenAI API,"
-        " dan menilai potensi viralnya dengan algoritma sederhana."
-    )
-    st.write("**Penulis:** Anastasia Theodora")
-    st.write("**Versi:** 1.3")
+        st.success(f"Klip berhasil dibuat: {start_time:.1f} → {start_time+clip_duration:.1f} detik")
+        st.video(out_tmp.name)
+
+        st.download_button(
+            "⬇️ Unduh Klip",
+            data=open(out_tmp.name, "rb").read(),
+            file_name=f"clip_{start_time:.1f}_{start_time+clip_duration:.1f}.mp4",
+            mime="video/mp4",
+        )
+
+        # transcribe & viral score
+        with st.spinner("Mentranskrip klip..."):
+            data = transcribe_video(out_tmp.name, verbose=False)
+        transcript = data["text"]
+        st.markdown("#### Transcript klip:")
+        st.write(transcript)
+
+        score = estimate_virality(transcript)
+        st.markdown(f"#### Viral Score: **{score:.1f}/100**")
+
+    except Exception as e:
+        st.error(f"Gagal memproses klip: {e}")
