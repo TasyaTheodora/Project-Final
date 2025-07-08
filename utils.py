@@ -4,24 +4,30 @@ import warnings
 import random
 import whisper
 import uuid
-import subprocess # Menggunakan library yang lebih modern
+import subprocess
 import logging
+from math import floor
 
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Mendefinisikan path FFMPEG dan folder sementara di satu tempat
+# --- KONFIGURASI ANALISIS VIRAL ---
+# Definisikan path FFMPEG dan folder sementara di satu tempat
 FFMPEG_EXE = os.path.abspath("ffmpeg/ffmpeg-2025-06-28-git-cfd1f81e7d-full_build/bin/ffmpeg.exe")
 TEMP_DIR = os.path.join(os.getcwd(), "temp_videos")
 os.makedirs(TEMP_DIR, exist_ok=True)
-
-# Pastikan environment variable diset untuk moviepy juga
 os.environ["IMAGEIO_FFMPEG_EXE"] = FFMPEG_EXE
+
+# Daftar kata kunci untuk analisis
+HOOK_WORDS = ["cara", "rahasia", "terbukti", "jangan", "stop", "ini dia", "ternyata", "begini"]
+POWER_WORDS = ["gratis", "diskon", "terbatas", "viral", "kaget", "terungkap", "wajib", "penting"]
+POSITIVE_WORDS = ["luar biasa", "terbaik", "cinta", "hebat", "sukses", "solusi", "mudah"]
+NEGATIVE_WORDS = ["buruk", "gagal", "kecewa", "masalah", "bahaya", "hindari", "salah"]
+# ------------------------------------
 
 def load_whisper_model():
     """Memuat model Whisper dengan penanganan error."""
     try:
-        # Anda bisa ganti "base" dengan "tiny" untuk lebih cepat, atau "small" untuk lebih akurat
         return whisper.load_model("base")
     except Exception as e:
         warnings.warn(f"Gagal memuat model Whisper: {e}")
@@ -30,70 +36,104 @@ def load_whisper_model():
 _whisper_model = load_whisper_model()
 
 def transcribe_video(video_path: str, verbose: bool = False) -> dict:
-    """
-    Mengekstrak audio dari video, mentranskripsikannya, dan membersihkan file sementara.
-    Menggunakan metode yang lebih tangguh untuk menangani file.
-    """
+    """Mengekstrak audio, mentranskripsi, dan membersihkan file sementara."""
     if _whisper_model is None:
         raise RuntimeError("Model Whisper tidak tersedia atau gagal dimuat.")
-
-    # Buat path untuk file .wav sementara di folder lokal kita
     temp_wav_path = os.path.join(TEMP_DIR, f"audio_{uuid.uuid4()}.wav")
-    
     try:
-        logging.info(f"Mengekstrak audio dari '{video_path}' ke '{temp_wav_path}'")
-        
-        # Command untuk ffmpeg dalam bentuk list (lebih aman)
-        command = [
-            FFMPEG_EXE,
-            '-y',  # Timpa file output jika sudah ada
-            '-i', video_path,
-            '-ar', '16000',  # Sample rate yang dibutuhkan Whisper
-            '-ac', '1',      # Audio mono
-            '-vn',           # Abaikan video
-            temp_wav_path
-        ]
-        
-        # Jalankan command dengan subprocess untuk kontrol penuh
+        command = [FFMPEG_EXE, '-y', '-i', video_path, '-ar', '16000', '-ac', '1', '-vn', temp_wav_path]
         result = subprocess.run(command, capture_output=True, text=True, check=False)
-
-        # Periksa jika ffmpeg menghasilkan error
         if result.returncode != 0:
-            error_message = f"FFMPEG gagal mengekstrak audio.\nError: {result.stderr}"
-            logging.error(error_message)
-            raise RuntimeError(error_message)
-
-        # Periksa apakah file audio benar-benar dibuat
+            raise RuntimeError(f"FFMPEG gagal mengekstrak audio. Error: {result.stderr}")
         if not os.path.exists(temp_wav_path) or os.path.getsize(temp_wav_path) == 0:
-            raise RuntimeError(f"Ekstraksi audio sepertinya berhasil, tapi file '{temp_wav_path}' kosong.")
-
-        logging.info("Audio berhasil diekstrak. Memulai transkripsi...")
+            raise RuntimeError(f"Ekstraksi audio gagal, file '{temp_wav_path}' kosong.")
         
-        # Transkripsi file audio yang sudah valid
         transcription = _whisper_model.transcribe(temp_wav_path, verbose=verbose)
-        logging.info("Transkripsi selesai.")
-
         text = transcription.get("text", "").strip()
-        segments = [
-            {"start": s["start"], "end": s["end"], "text": s["text"].strip()}
-            for s in transcription.get("segments", [])
-        ]
+        segments = transcription.get("segments", [])
         return {"text": text, "segments": segments}
-
     finally:
-        # Selalu pastikan file .wav sementara dihapus setelah selesai
         if os.path.exists(temp_wav_path):
             os.remove(temp_wav_path)
-            logging.info(f"File audio sementara '{temp_wav_path}' dihapus.")
 
+def estimate_virality(transcription_data: dict) -> dict:
+    """
+    Menganalisis potensi viral sebuah klip video berdasarkan transkrip.
+    Mengembalikan skor total dan rincian analisisnya.
+    """
+    text = transcription_data.get("text", "")
+    segments = transcription_data.get("segments", [])
 
-def estimate_virality(transcript: str) -> float:
-    """Memperkirakan skor viralitas berdasarkan transkrip."""
-    if not transcript:
-        return 0.0
-    # contoh scoring buatan: panjang kata mod 100 + noise
-    words = re.findall(r"\w+", transcript)
-    base = (len(words) % 100)
-    score = max(min(base + random.uniform(-10,10), 100), 0)
-    return round(score, 1)
+    if not text or not segments:
+        return {"total_score": 0, "details": {"Kesalahan": "Tidak ada transkrip untuk dianalisis."}}
 
+    word_count = len(re.findall(r'\w+', text))
+    duration = segments[-1]['end'] if segments else 0
+
+    # 1. Analisis Hook (5 detik pertama)
+    hook_text = " ".join([s['text'] for s in segments if s['start'] < 5])
+    hook_score = 0
+    hook_reason = "❌ Hook standar atau tidak terdeteksi."
+    if "?" in hook_text:
+        hook_score = 100
+        hook_reason = "✅ Hook kuat! Dimulai dengan pertanyaan."
+    else:
+        for word in HOOK_WORDS:
+            if re.search(rf"\b{word}\b", hook_text, re.IGNORECASE):
+                hook_score = 80
+                hook_reason = f"✅ Hook baik! Menggunakan kata kunci '{word}'."
+                break
+    
+    # 2. Analisis Kecepatan Bicara (Words Per Minute)
+    wpm = (word_count / duration) * 60 if duration > 0 else 0
+    wpm_score = 0
+    if 140 <= wpm <= 170:
+        wpm_score = 100 # Ideal
+    elif 120 <= wpm < 140 or 170 < wpm <= 190:
+        wpm_score = 75 # Cukup baik
+    elif wpm > 190:
+        wpm_score = 60 # Terlalu cepat
+    else:
+        wpm_score = 40 # Terlalu lambat
+    wpm_reason = f"⚡ Kecepatan bicara: {floor(wpm)} kata/menit."
+
+    # 3. Analisis Kata Kunci & Sentimen
+    power_word_count = sum(1 for word in POWER_WORDS if re.search(rf"\b{word}\b", text, re.IGNORECASE))
+    keyword_score = min(power_word_count * 25, 100) # 25 poin per kata, maks 100
+    keyword_reason = f"🔑 Ditemukan {power_word_count} kata kunci kuat."
+
+    positive_count = sum(1 for word in POSITIVE_WORDS if re.search(rf"\b{word}\b", text, re.IGNORECASE))
+    negative_count = sum(1 for word in NEGATIVE_WORDS if re.search(rf"\b{word}\b", text, re.IGNORECASE))
+    sentiment_score = 50 # Netral
+    sentiment_reason = "😐 Sentimen netral."
+    if positive_count > negative_count:
+        sentiment_score = 85
+        sentiment_reason = "😊 Sentimen cenderung positif."
+    elif negative_count > positive_count:
+        sentiment_score = 75 # Kontroversi juga bisa viral
+        sentiment_reason = "😠 Sentimen cenderung negatif (memicu perdebatan)."
+
+    # 4. Kalkulasi Skor Akhir (dengan pembobotan)
+    weights = {
+        "hook": 0.40,       # Hook adalah yang terpenting
+        "keyword": 0.25,
+        "wpm": 0.20,
+        "sentiment": 0.15
+    }
+    
+    final_score = (
+        hook_score * weights["hook"] +
+        keyword_score * weights["keyword"] +
+        wpm_score * weights["wpm"] +
+        sentiment_score * weights["sentiment"]
+    )
+
+    return {
+        "total_score": round(final_score),
+        "details": {
+            "Hook 5 Detik Pertama": hook_reason,
+            "Analisis Kata Kunci": keyword_reason,
+            "Tempo & Kecepatan": wpm_reason,
+            "Analisis Sentimen": sentiment_reason
+        }
+    }
