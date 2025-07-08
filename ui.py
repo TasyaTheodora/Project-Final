@@ -1,5 +1,7 @@
 import os
 import streamlit as st
+# --- PERUBAHAN ---
+# Menggunakan path import yang lebih direct untuk kompatibilitas yang lebih baik
 from moviepy.video.io.VideoFileClip import VideoFileClip
 from utils import transcribe_video, estimate_virality
 import uuid
