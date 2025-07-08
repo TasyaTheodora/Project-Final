@@ -14,10 +14,23 @@ st.write("Unggah video atau masukkan link YouTube untuk menemukan momen viral se
 TEMP_DIR = os.path.join(os.getcwd(), "temp_videos")
 os.makedirs(TEMP_DIR, exist_ok=True)
 
+# Inisialisasi session state jika belum ada
 if 'temp_video_path' not in st.session_state:
     st.session_state.temp_video_path = None
 if 'output_clip_path' not in st.session_state:
     st.session_state.output_clip_path = None
+if 'video_ready' not in st.session_state:
+    st.session_state.video_ready = False
+
+# ─── FUNGSI UNTUK MENGHAPUS FILE LAMA ───
+def cleanup_files():
+    if st.session_state.temp_video_path and os.path.exists(st.session_state.temp_video_path):
+        os.remove(st.session_state.temp_video_path)
+    if st.session_state.output_clip_path and os.path.exists(st.session_state.output_clip_path):
+        os.remove(st.session_state.output_clip_path)
+    st.session_state.temp_video_path = None
+    st.session_state.output_clip_path = None
+    st.session_state.video_ready = False
 
 # ─── INPUT VIDEO: DENGAN OPSI TAB ───
 input_tab1, input_tab2 = st.tabs(["Unggah File", "🔗 Dari Link YouTube"])
@@ -25,50 +38,42 @@ input_tab1, input_tab2 = st.tabs(["Unggah File", "🔗 Dari Link YouTube"])
 with input_tab1:
     uploaded_file = st.file_uploader("Pilih file video lokal:", type=["mp4", "mov", "avi", "mkv"])
     if uploaded_file:
-        if st.session_state.temp_video_path and os.path.exists(st.session_state.temp_video_path):
-            os.remove(st.session_state.temp_video_path)
-        
+        cleanup_files() # Hapus file lama sebelum memproses yang baru
         suffix = os.path.splitext(uploaded_file.name)[1]
         temp_path = os.path.join(TEMP_DIR, f"{uuid.uuid4()}{suffix}")
         with open(temp_path, "wb") as f:
             f.write(uploaded_file.getbuffer())
         st.session_state.temp_video_path = temp_path
-        st.session_state.output_clip_path = None
+        st.session_state.video_ready = True
         st.rerun()
 
 with input_tab2:
     youtube_url = st.text_input("Masukkan URL video YouTube:")
     if st.button("Proses Link YouTube"):
         if youtube_url:
+            cleanup_files() # Hapus file lama sebelum download
             with st.spinner("Mengunduh video dari YouTube... Ini mungkin memakan waktu beberapa saat."):
                 try:
-                    if st.session_state.temp_video_path and os.path.exists(st.session_state.temp_video_path):
-                        os.remove(st.session_state.temp_video_path)
-
                     temp_path = os.path.join(TEMP_DIR, f"{uuid.uuid4()}.mp4")
-                    
                     ydl_opts = {
                         'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
                         'outtmpl': temp_path,
                         'noplaylist': True,
                     }
-
                     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                         ydl.download([youtube_url])
                     
                     st.session_state.temp_video_path = temp_path
-                    st.session_state.output_clip_path = None
-                    # Hapus st.rerun() dan biarkan script selesai secara alami
-                    # Ini akan membuat aplikasi lebih stabil di cloud
+                    st.session_state.video_ready = True
+                    st.rerun() # Paksa refresh setelah download selesai
 
                 except Exception as e:
                     st.error(f"Gagal mengunduh video dari YouTube. Error: {e}")
         else:
             st.warning("Harap masukkan URL YouTube.")
 
-
-# ─── BAGIAN UTAMA APLIKASI ───
-if not st.session_state.temp_video_path or not os.path.exists(st.session_state.temp_video_path):
+# ─── BAGIAN UTAMA APLIKASI (HANYA JALAN JIKA VIDEO SIAP) ───
+if not st.session_state.video_ready or not st.session_state.temp_video_path or not os.path.exists(st.session_state.temp_video_path):
     st.info("Silakan unggah file atau proses link YouTube untuk memulai.")
     st.stop()
 
@@ -99,6 +104,7 @@ try:
 
     if st.button("🚀 Potong, Transkrip, dan Analisa!", type="primary"):
         with st.spinner("Memotong video..."):
+            # ... (sisa kode pemotongan sama)
             video_to_clip, sub_clip = None, None
             try:
                 video_to_clip = VideoFileClip(st.session_state.temp_video_path)
@@ -122,6 +128,7 @@ if st.session_state.output_clip_path and os.path.exists(st.session_state.output_
         st.download_button("⬇️ Unduh Klip", data=f.read(), file_name=f"clip.mp4", mime="video/mp4")
     
     with st.spinner("Menganalisis potensi viral..."):
+        # ... (sisa kode analisis sama)
         transcription_data = transcribe_video(st.session_state.output_clip_path)
         
         if transcription_data and transcription_data["text"]:
@@ -141,3 +148,4 @@ if st.session_state.output_clip_path and os.path.exists(st.session_state.output_
             st.markdown(f"> _{transcription_data['text']}_")
         else:
             st.warning("Tidak dapat menganalisis video karena tidak ada teks yang terdeteksi.")
+
