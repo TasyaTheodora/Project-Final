@@ -12,11 +12,9 @@ from math import floor
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # --- KONFIGURASI ANALISIS VIRAL ---
-# Definisikan path FFMPEG dan folder sementara di satu tempat
-FFMPEG_EXE = os.path.abspath("ffmpeg/ffmpeg-2025-06-28-git-cfd1f81e7d-full_build/bin/ffmpeg.exe")
+# FFMPEG_EXE dan os.environ dihapus. Program akan menggunakan FFMPEG dari sistem.
 TEMP_DIR = os.path.join(os.getcwd(), "temp_videos")
 os.makedirs(TEMP_DIR, exist_ok=True)
-os.environ["IMAGEIO_FFMPEG_EXE"] = FFMPEG_EXE
 
 # Daftar kata kunci untuk analisis
 HOOK_WORDS = ["cara", "rahasia", "terbukti", "jangan", "stop", "ini dia", "ternyata", "begini"]
@@ -41,10 +39,23 @@ def transcribe_video(video_path: str, verbose: bool = False) -> dict:
         raise RuntimeError("Model Whisper tidak tersedia atau gagal dimuat.")
     temp_wav_path = os.path.join(TEMP_DIR, f"audio_{uuid.uuid4()}.wav")
     try:
-        command = [FFMPEG_EXE, '-y', '-i', video_path, '-ar', '16000', '-ac', '1', '-vn', temp_wav_path]
+        logging.info(f"Mengekstrak audio dari '{video_path}' ke '{temp_wav_path}'")
+        
+        # Command sekarang hanya memanggil "ffmpeg" secara langsung
+        command = [
+            "ffmpeg",
+            '-y',
+            '-i', video_path,
+            '-ar', '16000',
+            '-ac', '1',
+            '-vn',
+            temp_wav_path
+        ]
+        
         result = subprocess.run(command, capture_output=True, text=True, check=False)
+
         if result.returncode != 0:
-            raise RuntimeError(f"FFMPEG gagal mengekstrak audio. Error: {result.stderr}")
+            raise RuntimeError(f"FFMPEG gagal mengekstrak audio.\nError: {result.stderr}")
         if not os.path.exists(temp_wav_path) or os.path.getsize(temp_wav_path) == 0:
             raise RuntimeError(f"Ekstraksi audio gagal, file '{temp_wav_path}' kosong.")
         
@@ -59,7 +70,6 @@ def transcribe_video(video_path: str, verbose: bool = False) -> dict:
 def estimate_virality(transcription_data: dict) -> dict:
     """
     Menganalisis potensi viral sebuah klip video berdasarkan transkrip.
-    Mengembalikan skor total dan rincian analisisnya.
     """
     text = transcription_data.get("text", "")
     segments = transcription_data.get("segments", [])
@@ -87,46 +97,31 @@ def estimate_virality(transcription_data: dict) -> dict:
     # 2. Analisis Kecepatan Bicara (Words Per Minute)
     wpm = (word_count / duration) * 60 if duration > 0 else 0
     wpm_score = 0
-    if 140 <= wpm <= 170:
-        wpm_score = 100 # Ideal
-    elif 120 <= wpm < 140 or 170 < wpm <= 190:
-        wpm_score = 75 # Cukup baik
-    elif wpm > 190:
-        wpm_score = 60 # Terlalu cepat
-    else:
-        wpm_score = 40 # Terlalu lambat
+    if 140 <= wpm <= 170: wpm_score = 100
+    elif 120 <= wpm < 140 or 170 < wpm <= 190: wpm_score = 75
+    elif wpm > 190: wpm_score = 60
+    else: wpm_score = 40
     wpm_reason = f"⚡ Kecepatan bicara: {floor(wpm)} kata/menit."
 
     # 3. Analisis Kata Kunci & Sentimen
     power_word_count = sum(1 for word in POWER_WORDS if re.search(rf"\b{word}\b", text, re.IGNORECASE))
-    keyword_score = min(power_word_count * 25, 100) # 25 poin per kata, maks 100
+    keyword_score = min(power_word_count * 25, 100)
     keyword_reason = f"🔑 Ditemukan {power_word_count} kata kunci kuat."
 
     positive_count = sum(1 for word in POSITIVE_WORDS if re.search(rf"\b{word}\b", text, re.IGNORECASE))
     negative_count = sum(1 for word in NEGATIVE_WORDS if re.search(rf"\b{word}\b", text, re.IGNORECASE))
-    sentiment_score = 50 # Netral
+    sentiment_score = 50
     sentiment_reason = "😐 Sentimen netral."
     if positive_count > negative_count:
         sentiment_score = 85
         sentiment_reason = "😊 Sentimen cenderung positif."
     elif negative_count > positive_count:
-        sentiment_score = 75 # Kontroversi juga bisa viral
+        sentiment_score = 75
         sentiment_reason = "😠 Sentimen cenderung negatif (memicu perdebatan)."
 
-    # 4. Kalkulasi Skor Akhir (dengan pembobotan)
-    weights = {
-        "hook": 0.40,       # Hook adalah yang terpenting
-        "keyword": 0.25,
-        "wpm": 0.20,
-        "sentiment": 0.15
-    }
-    
-    final_score = (
-        hook_score * weights["hook"] +
-        keyword_score * weights["keyword"] +
-        wpm_score * weights["wpm"] +
-        sentiment_score * weights["sentiment"]
-    )
+    # 4. Kalkulasi Skor Akhir
+    weights = {"hook": 0.40, "keyword": 0.25, "wpm": 0.20, "sentiment": 0.15}
+    final_score = (hook_score * weights["hook"] + keyword_score * weights["keyword"] + wpm_score * weights["wpm"] + sentiment_score * weights["sentiment"])
 
     return {
         "total_score": round(final_score),

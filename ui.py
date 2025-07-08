@@ -12,15 +12,9 @@ st.write("Unggah video, potong bagian terbaik, lalu dapatkan transkrip dan skor 
 TEMP_DIR = os.path.join(os.getcwd(), "temp_videos")
 os.makedirs(TEMP_DIR, exist_ok=True)
 
-try:
-    ffmpeg_path = os.path.abspath("ffmpeg/ffmpeg-2025-06-28-git-cfd1f81e7d-full_build/bin/ffmpeg.exe")
-    if not os.path.exists(ffmpeg_path):
-        st.error(f"FFMPEG tidak ditemukan di path: {ffmpeg_path}. Pastikan struktur folder sudah benar.")
-        st.stop()
-    os.environ["IMAGEIO_FFMPEG_EXE"] = ffmpeg_path
-except Exception as e:
-    st.error(f"Terjadi masalah saat mengatur path FFMPEG: {e}")
-    st.stop()
+# --- BLOK PATH FFMPEG DIHAPUS ---
+# Kita tidak lagi memerlukan path FFMPEG lokal. 
+# Server akan menemukannya secara otomatis berkat packages.txt.
 
 if 'temp_video_path' not in st.session_state:
     st.session_state.temp_video_path = None
