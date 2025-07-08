@@ -11,8 +11,7 @@ from math import floor
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# --- KONFIGURASI ANALISIS VIRAL ---
-# FFMPEG_EXE dan os.environ dihapus. Program akan menggunakan FFMPEG dari sistem.
+# --- KONFIGURASI ---
 TEMP_DIR = os.path.join(os.getcwd(), "temp_videos")
 os.makedirs(TEMP_DIR, exist_ok=True)
 
@@ -26,7 +25,9 @@ NEGATIVE_WORDS = ["buruk", "gagal", "kecewa", "masalah", "bahaya", "hindari", "s
 def load_whisper_model():
     """Memuat model Whisper dengan penanganan error."""
     try:
-        return whisper.load_model("base")
+        # --- PERUBAHAN KUNCI ---
+        # Mengganti "base" dengan "tiny" untuk menghemat memori di server cloud.
+        return whisper.load_model("tiny")
     except Exception as e:
         warnings.warn(f"Gagal memuat model Whisper: {e}")
         return None
@@ -41,7 +42,6 @@ def transcribe_video(video_path: str, verbose: bool = False) -> dict:
     try:
         logging.info(f"Mengekstrak audio dari '{video_path}' ke '{temp_wav_path}'")
         
-        # Command sekarang hanya memanggil "ffmpeg" secara langsung
         command = [
             "ffmpeg",
             '-y',
