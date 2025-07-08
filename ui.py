@@ -25,12 +25,18 @@ input_tab1, input_tab2 = st.tabs(["Unggah File", "🔗 Dari Link YouTube"])
 with input_tab1:
     uploaded_file = st.file_uploader("Pilih file video lokal:", type=["mp4", "mov", "avi", "mkv"])
     if uploaded_file:
+        # Hapus video lama jika ada
+        if st.session_state.temp_video_path and os.path.exists(st.session_state.temp_video_path):
+            os.remove(st.session_state.temp_video_path)
+        
         suffix = os.path.splitext(uploaded_file.name)[1]
         temp_path = os.path.join(TEMP_DIR, f"{uuid.uuid4()}{suffix}")
         with open(temp_path, "wb") as f:
             f.write(uploaded_file.getbuffer())
         st.session_state.temp_video_path = temp_path
-        st.session_state.output_clip_path = None # Reset klip lama
+        st.session_state.output_clip_path = None
+        # Rerun untuk langsung menampilkan video setelah diunggah
+        st.rerun()
 
 with input_tab2:
     youtube_url = st.text_input("Masukkan URL video YouTube:")
@@ -38,10 +44,12 @@ with input_tab2:
         if youtube_url:
             with st.spinner("Mengunduh video dari YouTube... Ini mungkin memakan waktu beberapa saat."):
                 try:
-                    # Tentukan path output
+                    # Hapus video lama jika ada
+                    if st.session_state.temp_video_path and os.path.exists(st.session_state.temp_video_path):
+                        os.remove(st.session_state.temp_video_path)
+
                     temp_path = os.path.join(TEMP_DIR, f"{uuid.uuid4()}.mp4")
                     
-                    # Konfigurasi yt-dlp untuk mengunduh video terbaik dalam format mp4
                     ydl_opts = {
                         'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
                         'outtmpl': temp_path,
@@ -53,8 +61,10 @@ with input_tab2:
                     
                     st.session_state.temp_video_path = temp_path
                     st.session_state.output_clip_path = None
-                    st.success("Video YouTube berhasil diunduh!")
-                    # Rerun untuk menampilkan video dan kontrol
+                    
+                    # --- PERUBAHAN KUNCI ---
+                    # Kita tidak perlu pesan sukses di sini, karena st.rerun() akan langsung
+                    # menyegarkan halaman dan menampilkan video player di bawah.
                     st.rerun()
 
                 except Exception as e:
@@ -70,6 +80,7 @@ if not st.session_state.temp_video_path or not os.path.exists(st.session_state.t
     st.info("Silakan unggah file atau proses link YouTube untuk memulai.")
     st.stop()
 
+st.success("✅ Video siap diproses!")
 st.video(st.session_state.temp_video_path)
 
 try:
