@@ -3,7 +3,7 @@ import streamlit as st
 from moviepy.video.io.VideoFileClip import VideoFileClip
 from utils import transcribe_video, estimate_virality
 import uuid
-import yt_dlp # Library baru untuk download YouTube
+import yt_dlp 
 import logging
 
 # ─── SETUP ───
@@ -25,7 +25,6 @@ input_tab1, input_tab2 = st.tabs(["Unggah File", "🔗 Dari Link YouTube"])
 with input_tab1:
     uploaded_file = st.file_uploader("Pilih file video lokal:", type=["mp4", "mov", "avi", "mkv"])
     if uploaded_file:
-        # Hapus video lama jika ada
         if st.session_state.temp_video_path and os.path.exists(st.session_state.temp_video_path):
             os.remove(st.session_state.temp_video_path)
         
@@ -35,7 +34,6 @@ with input_tab1:
             f.write(uploaded_file.getbuffer())
         st.session_state.temp_video_path = temp_path
         st.session_state.output_clip_path = None
-        # Rerun untuk langsung menampilkan video setelah diunggah
         st.rerun()
 
 with input_tab2:
@@ -44,7 +42,6 @@ with input_tab2:
         if youtube_url:
             with st.spinner("Mengunduh video dari YouTube... Ini mungkin memakan waktu beberapa saat."):
                 try:
-                    # Hapus video lama jika ada
                     if st.session_state.temp_video_path and os.path.exists(st.session_state.temp_video_path):
                         os.remove(st.session_state.temp_video_path)
 
@@ -61,11 +58,8 @@ with input_tab2:
                     
                     st.session_state.temp_video_path = temp_path
                     st.session_state.output_clip_path = None
-                    
-                    # --- PERUBAHAN KUNCI ---
-                    # Kita tidak perlu pesan sukses di sini, karena st.rerun() akan langsung
-                    # menyegarkan halaman dan menampilkan video player di bawah.
-                    st.rerun()
+                    # Hapus st.rerun() dan biarkan script selesai secara alami
+                    # Ini akan membuat aplikasi lebih stabil di cloud
 
                 except Exception as e:
                     st.error(f"Gagal mengunduh video dari YouTube. Error: {e}")
@@ -73,9 +67,7 @@ with input_tab2:
             st.warning("Harap masukkan URL YouTube.")
 
 
-# ─── BAGIAN UTAMA APLIKASI (TIDAK BERUBAH) ───
-# Kode di bawah ini akan berjalan setelah video tersedia, baik dari upload maupun dari link.
-
+# ─── BAGIAN UTAMA APLIKASI ───
 if not st.session_state.temp_video_path or not os.path.exists(st.session_state.temp_video_path):
     st.info("Silakan unggah file atau proses link YouTube untuk memulai.")
     st.stop()
