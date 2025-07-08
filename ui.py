@@ -50,13 +50,11 @@ with input_tab2:
             cleanup_files()
             with st.spinner("Menganalisis dan mengunduh video..."):
                 try:
-                    # --- LANGKAH 1: AMBIL INFORMASI VIDEO (TERMASUK DURASI) TANPA DOWNLOAD ---
                     ydl_opts_info = {'noplaylist': True, 'quiet': True}
                     with yt_dlp.YoutubeDL(ydl_opts_info) as ydl:
                         info_dict = ydl.extract_info(youtube_url, download=False)
                         st.session_state.duration = info_dict.get('duration', 0)
 
-                    # --- LANGKAH 2: DOWNLOAD VIDEO DENGAN KUALITAS YANG DIOPTIMALKAN (720p) ---
                     temp_path = os.path.join(TEMP_DIR, f"{uuid.uuid4()}.mp4")
                     ydl_opts_download = {
                         'format': 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
@@ -85,12 +83,13 @@ st.success("✅ Video siap diproses!")
 st.video(st.session_state.temp_video_path)
 
 try:
-    # --- PERUBAHAN KUNCI: GUNAKAN DURASI DARI SESSION STATE ---
-    # Ini menghindari pembukaan file video yang berat setelah download
     duration = st.session_state.duration
-    if duration == 0: # Fallback jika durasi gagal didapat dari yt-dlp
+    if duration == 0: 
         with VideoFileClip(st.session_state.temp_video_path) as v:
             duration = v.duration
+    
+    # --- PERBAIKAN: Pastikan semua nilai numerik adalah float ---
+    duration = float(duration)
     
     st.markdown("---")
     st.markdown("### Atur Klip")
@@ -100,10 +99,12 @@ try:
         start_time = st.number_input("Mulai dari (detik):", min_value=0.0, max_value=duration, value=0.0, step=0.5)
     with col2:
         max_clip_duration = duration - start_time
-        default_duration = min(30.0, max_clip_duration)
+        default_duration = min(30.0, float(max_clip_duration))
+        slider_max = float(max_clip_duration if max_clip_duration > 1.0 else 1.0)
+        
         clip_duration = st.slider("Durasi klip (detik):", 
                                   min_value=1.0, 
-                                  max_value=max_clip_duration if max_clip_duration > 1.0 else 1.0, 
+                                  max_value=slider_max, 
                                   value=default_duration,
                                   step=1.0)
 
