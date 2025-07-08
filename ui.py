@@ -13,7 +13,7 @@ st.write("Unggah video, potong bagian terbaik, lalu dapatkan transkrip dan skor 
 # Pastikan path ini benar sesuai dengan lokasi di komputer Anda.
 # Cara terbaik adalah menggunakan path absolut untuk menghindari kebingungan.
 try:
-    ffmpeg_path = os.path.abspath("ffmpeg/ffmpeg-2025-06-28-git-cfd1f81e7d-full_build/bin/ffmpeg.exe")
+    ffmpeg_path = os.path.abspath("C:\Users\willi\Projects\video-clip-ai-capstone\ffmpeg\ffmpeg-2025-06-28-git-cfd1f81e7d-full_build\bin")
     if not os.path.exists(ffmpeg_path):
         st.error(f"FFMPEG tidak ditemukan di path: {ffmpeg_path}. Pastikan path sudah benar.")
         st.stop()
