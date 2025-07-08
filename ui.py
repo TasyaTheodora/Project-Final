@@ -1,6 +1,5 @@
 import os
 import streamlit as st
-# Menggunakan path import yang paling direct dan stabil
 from moviepy.video.io.VideoFileClip import VideoFileClip
 from utils import transcribe_video, estimate_virality
 import uuid
@@ -10,11 +9,9 @@ st.set_page_config(page_title="Video Trimmer AI", layout="wide")
 st.title("✂️ AI Video Trimmer & Scorer")
 st.write("Unggah video, potong bagian terbaik, lalu dapatkan transkrip dan skor viralitasnya.")
 
-# Buat folder sementara jika belum ada
 TEMP_DIR = os.path.join(os.getcwd(), "temp_videos")
 os.makedirs(TEMP_DIR, exist_ok=True)
 
-# ─── PATH FFMPEG (PENTING) ───
 try:
     ffmpeg_path = os.path.abspath("ffmpeg/ffmpeg-2025-06-28-git-cfd1f81e7d-full_build/bin/ffmpeg.exe")
     if not os.path.exists(ffmpeg_path):
@@ -25,7 +22,6 @@ except Exception as e:
     st.error(f"Terjadi masalah saat mengatur path FFMPEG: {e}")
     st.stop()
 
-# ─── UPLOADER & STATE MANAGEMENT ───
 if 'temp_video_path' not in st.session_state:
     st.session_state.temp_video_path = None
 if 'output_clip_path' not in st.session_state:
@@ -39,7 +35,7 @@ if uploaded:
     with open(temp_path, "wb") as f:
         f.write(uploaded.getbuffer())
     st.session_state.temp_video_path = temp_path
-    st.session_state.output_clip_path = None # Reset klip lama
+    st.session_state.output_clip_path = None
 
 if not st.session_state.temp_video_path or not os.path.exists(st.session_state.temp_video_path):
     st.info("Silakan unggah file video untuk memulai.")
@@ -47,9 +43,7 @@ if not st.session_state.temp_video_path or not os.path.exists(st.session_state.t
 
 st.video(st.session_state.temp_video_path)
 
-# ─── ATUR KLIP ───
 try:
-    # Buka file sekali untuk mendapatkan durasi
     with VideoFileClip(st.session_state.temp_video_path) as video_for_duration:
         duration = video_for_duration.duration
     
@@ -73,32 +67,21 @@ try:
 
     if st.button("🚀 Potong, Transkrip, dan Analisa!", type="primary"):
         with st.spinner("Memotong video..."):
-            video_to_clip = None
-            sub_clip = None
+            video_to_clip, sub_clip = None, None
             try:
-                # Muat ulang klip dari file TEPAT sebelum memotong
                 video_to_clip = VideoFileClip(st.session_state.temp_video_path)
                 sub_clip = video_to_clip.subclip(start_time, end_time)
-                
                 output_path = os.path.join(TEMP_DIR, f"clip_{uuid.uuid4()}.mp4")
                 sub_clip.write_videofile(output_path, codec="libx264", audio_codec="aac", verbose=False, logger=None)
                 st.session_state.output_clip_path = output_path
-                
-            except Exception as e:
-                st.error(f"Gagal saat memotong klip: {e}")
-                st.stop()
             finally:
-                # Pastikan semua objek klip ditutup
-                if sub_clip:
-                    sub_clip.close()
-                if video_to_clip:
-                    video_to_clip.close()
+                if sub_clip: sub_clip.close()
+                if video_to_clip: video_to_clip.close()
 
 except Exception as e:
-    st.error(f"Gagal membaca video awal. Error: {e}")
+    st.error(f"Gagal memproses video. Error: {e}")
     st.stop()
 
-# Tampilkan hasil HANYA JIKA klip sudah dibuat
 if st.session_state.output_clip_path and os.path.exists(st.session_state.output_clip_path):
     st.success("✅ Klip berhasil dibuat!")
     st.video(st.session_state.output_clip_path)
@@ -106,11 +89,23 @@ if st.session_state.output_clip_path and os.path.exists(st.session_state.output_
     with open(st.session_state.output_clip_path, "rb") as f:
         st.download_button("⬇️ Unduh Klip", data=f.read(), file_name=f"clip.mp4", mime="video/mp4")
     
-    # Lanjutkan ke transkripsi...
-    with st.spinner("Mentranskrip klip..."):
-        d = transcribe_video(st.session_state.output_clip_path)
-        st.markdown("#### Transcript")
-        st.write(d["text"])
+    with st.spinner("Menganalisis potensi viral..."):
+        transcription_data = transcribe_video(st.session_state.output_clip_path)
+        
+        if transcription_data and transcription_data["text"]:
+            analysis_result = estimate_virality(transcription_data)
+            score = analysis_result["total_score"]
+            details = analysis_result["details"]
 
-        score = estimate_virality(d["text"])
-        st.markdown(f"#### Viral Score: **{score}/100**")
+            st.markdown(f"#### 📈 Prediksi Skor Viralitas")
+            st.progress(score, text=f"**{score}/100**")
+
+            with st.expander("Lihat Detail Analisis Skor"):
+                for key, value in details.items():
+                    st.markdown(f"**{key}**: {value}")
+
+            st.markdown("---")
+            st.markdown("#### 📝 Transkrip Klip")
+            st.markdown(f"> _{transcription_data['text']}_")
+        else:
+            st.warning("Tidak dapat menganalisis video karena tidak ada teks yang terdeteksi.")
