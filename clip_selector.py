@@ -1,6 +1,6 @@
 # file: clip_selector.py
 import os, re
-from moviepy.editor import VideoFileClip
+from moviepy.video.io.VideoFileClip import VideoFileClip
 from utils import transcribe_video
 
 def select_clips(video_path: str, keywords: list[str], clip_duration: int=30) -> list[str]:
