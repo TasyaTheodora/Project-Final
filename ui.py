@@ -3,36 +3,71 @@ import streamlit as st
 from moviepy.video.io.VideoFileClip import VideoFileClip
 from utils import transcribe_video, estimate_virality
 import uuid
+import yt_dlp # Library baru untuk download YouTube
+import logging
 
 # ─── SETUP ───
 st.set_page_config(page_title="Video Trimmer AI", layout="wide")
-st.title("✂️ AI Video Trimmer & Scorer")
-st.write("Unggah video, potong bagian terbaik, lalu dapatkan transkrip dan skor viralitasnya.")
+st.title("✂️ AI Video Clipper & Scorer")
+st.write("Unggah video atau masukkan link YouTube untuk menemukan momen viral secara otomatis.")
 
 TEMP_DIR = os.path.join(os.getcwd(), "temp_videos")
 os.makedirs(TEMP_DIR, exist_ok=True)
-
-# --- BLOK PATH FFMPEG DIHAPUS ---
-# Kita tidak lagi memerlukan path FFMPEG lokal. 
-# Server akan menemukannya secara otomatis berkat packages.txt.
 
 if 'temp_video_path' not in st.session_state:
     st.session_state.temp_video_path = None
 if 'output_clip_path' not in st.session_state:
     st.session_state.output_clip_path = None
 
-uploaded = st.file_uploader("Pilih file video:", type=["mp4", "mov", "avi", "mkv"])
+# ─── INPUT VIDEO: DENGAN OPSI TAB ───
+input_tab1, input_tab2 = st.tabs(["Unggah File", "🔗 Dari Link YouTube"])
 
-if uploaded:
-    suffix = os.path.splitext(uploaded.name)[1]
-    temp_path = os.path.join(TEMP_DIR, f"{uuid.uuid4()}{suffix}")
-    with open(temp_path, "wb") as f:
-        f.write(uploaded.getbuffer())
-    st.session_state.temp_video_path = temp_path
-    st.session_state.output_clip_path = None
+with input_tab1:
+    uploaded_file = st.file_uploader("Pilih file video lokal:", type=["mp4", "mov", "avi", "mkv"])
+    if uploaded_file:
+        suffix = os.path.splitext(uploaded_file.name)[1]
+        temp_path = os.path.join(TEMP_DIR, f"{uuid.uuid4()}{suffix}")
+        with open(temp_path, "wb") as f:
+            f.write(uploaded_file.getbuffer())
+        st.session_state.temp_video_path = temp_path
+        st.session_state.output_clip_path = None # Reset klip lama
+
+with input_tab2:
+    youtube_url = st.text_input("Masukkan URL video YouTube:")
+    if st.button("Proses Link YouTube"):
+        if youtube_url:
+            with st.spinner("Mengunduh video dari YouTube... Ini mungkin memakan waktu beberapa saat."):
+                try:
+                    # Tentukan path output
+                    temp_path = os.path.join(TEMP_DIR, f"{uuid.uuid4()}.mp4")
+                    
+                    # Konfigurasi yt-dlp untuk mengunduh video terbaik dalam format mp4
+                    ydl_opts = {
+                        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+                        'outtmpl': temp_path,
+                        'noplaylist': True,
+                    }
+
+                    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                        ydl.download([youtube_url])
+                    
+                    st.session_state.temp_video_path = temp_path
+                    st.session_state.output_clip_path = None
+                    st.success("Video YouTube berhasil diunduh!")
+                    # Rerun untuk menampilkan video dan kontrol
+                    st.rerun()
+
+                except Exception as e:
+                    st.error(f"Gagal mengunduh video dari YouTube. Error: {e}")
+        else:
+            st.warning("Harap masukkan URL YouTube.")
+
+
+# ─── BAGIAN UTAMA APLIKASI (TIDAK BERUBAH) ───
+# Kode di bawah ini akan berjalan setelah video tersedia, baik dari upload maupun dari link.
 
 if not st.session_state.temp_video_path or not os.path.exists(st.session_state.temp_video_path):
-    st.info("Silakan unggah file video untuk memulai.")
+    st.info("Silakan unggah file atau proses link YouTube untuk memulai.")
     st.stop()
 
 st.video(st.session_state.temp_video_path)
