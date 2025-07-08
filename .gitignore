@@ -1,14 +1,11 @@
-# Python cache
-__pycache__/
-*.pyc
+Folder virtual environment
+.venv/
 
-# data & outputs
-data/
-outputs/
+Folder cache Python
+pycache/
 
-# virtual env
-.env/
-venv/
+Folder output sementara
+temp_videos/
 
-# IDE/Editor
-.vscode/
+Folder FFMPEG lokal (tidak diperlukan di cloud)
+ffmpeg/
