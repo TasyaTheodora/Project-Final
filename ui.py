@@ -28,6 +28,8 @@ except Exception as e:
 # ─── UPLOADER & STATE MANAGEMENT ───
 if 'temp_video_path' not in st.session_state:
     st.session_state.temp_video_path = None
+if 'output_clip_path' not in st.session_state:
+    st.session_state.output_clip_path = None
 
 uploaded = st.file_uploader("Pilih file video:", type=["mp4", "mov", "avi", "mkv"])
 
@@ -37,6 +39,7 @@ if uploaded:
     with open(temp_path, "wb") as f:
         f.write(uploaded.getbuffer())
     st.session_state.temp_video_path = temp_path
+    st.session_state.output_clip_path = None # Reset klip lama
 
 if not st.session_state.temp_video_path or not os.path.exists(st.session_state.temp_video_path):
     st.info("Silakan unggah file video untuk memulai.")
@@ -46,7 +49,7 @@ st.video(st.session_state.temp_video_path)
 
 # ─── ATUR KLIP ───
 try:
-    # Kita tetap perlu membuka file sekali untuk mendapatkan durasi
+    # Buka file sekali untuk mendapatkan durasi
     with VideoFileClip(st.session_state.temp_video_path) as video_for_duration:
         duration = video_for_duration.duration
     
@@ -70,50 +73,44 @@ try:
 
     if st.button("🚀 Potong, Transkrip, dan Analisa!", type="primary"):
         with st.spinner("Memotong video..."):
-            video_to_clip = None # Pastikan variabel ada
+            video_to_clip = None
+            sub_clip = None
             try:
                 # Muat ulang klip dari file TEPAT sebelum memotong
                 video_to_clip = VideoFileClip(st.session_state.temp_video_path)
-                
-                # --- BAGIAN DIAGNOSIS PENTING ---
-                # Kita akan cek objek ini sebelum mencoba memotongnya
-                st.warning(f"Tipe objek yang akan dipotong: **{type(video_to_clip)}**")
-                has_subclip = 'subclip' in dir(video_to_clip)
-                st.info(f"Apakah objek ini punya method 'subclip'? **{has_subclip}**")
-                
-                # Hanya lanjutkan jika methodnya ada
-                if not has_subclip:
-                    st.error("DIAGNOSIS: Objek video tidak memiliki method 'subclip'. Ini adalah akar masalahnya. Instalasi MoviePy mungkin bermasalah.")
-                    st.stop()
-
                 sub_clip = video_to_clip.subclip(start_time, end_time)
                 
                 output_path = os.path.join(TEMP_DIR, f"clip_{uuid.uuid4()}.mp4")
                 sub_clip.write_videofile(output_path, codec="libx264", audio_codec="aac", verbose=False, logger=None)
+                st.session_state.output_clip_path = output_path
                 
-                # Tutup semua klip setelah selesai
-                sub_clip.close()
-                video_to_clip.close()
-
-                # Tampilkan hasil
-                st.success("✅ Klip berhasil dibuat!")
-                st.video(output_path)
-                
-                # Sediakan untuk di-download
-                with open(output_path, "rb") as f:
-                    st.download_button("⬇️ Unduh Klip", data=f.read(), file_name=f"clip.mp4", mime="video/mp4")
-                
-                # Lanjutkan ke transkripsi... (kode lain sama)
-
             except Exception as e:
-                # Tangkap error spesifik yang Anda alami
                 st.error(f"Gagal saat memotong klip: {e}")
-                # Jika video_to_clip berhasil dibuat, kita tutup
+                st.stop()
+            finally:
+                # Pastikan semua objek klip ditutup
+                if sub_clip:
+                    sub_clip.close()
                 if video_to_clip:
                     video_to_clip.close()
-                st.stop()
 
 except Exception as e:
     st.error(f"Gagal membaca video awal. Error: {e}")
     st.stop()
 
+# Tampilkan hasil HANYA JIKA klip sudah dibuat
+if st.session_state.output_clip_path and os.path.exists(st.session_state.output_clip_path):
+    st.success("✅ Klip berhasil dibuat!")
+    st.video(st.session_state.output_clip_path)
+    
+    with open(st.session_state.output_clip_path, "rb") as f:
+        st.download_button("⬇️ Unduh Klip", data=f.read(), file_name=f"clip.mp4", mime="video/mp4")
+    
+    # Lanjutkan ke transkripsi...
+    with st.spinner("Mentranskrip klip..."):
+        d = transcribe_video(st.session_state.output_clip_path)
+        st.markdown("#### Transcript")
+        st.write(d["text"])
+
+        score = estimate_virality(d["text"])
+        st.markdown(f"#### Viral Score: **{score}/100**")
