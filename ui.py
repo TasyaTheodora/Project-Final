@@ -3,69 +3,64 @@ import tempfile
 import streamlit as st
 from moviepy.video.io.VideoFileClip import VideoFileClip
 from utils import transcribe_video, estimate_virality
+import uuid # Untuk membuat nama file unik
 
-# ─── CONFIG HALAMAN ───
+# ─── SETUP ───
 st.set_page_config(page_title="Video Trimmer AI", layout="wide")
 st.title("✂️ AI Video Trimmer & Scorer")
 st.write("Unggah video, potong bagian terbaik, lalu dapatkan transkrip dan skor viralitasnya.")
 
+# Buat folder sementara jika belum ada
+TEMP_DIR = os.path.join(os.getcwd(), "temp_videos")
+os.makedirs(TEMP_DIR, exist_ok=True)
+
 # ─── PATH FFMPEG (PENTING) ───
-# Pastikan path ini benar sesuai dengan lokasi di komputer Anda.
-# Cara terbaik adalah menggunakan path absolut untuk menghindari kebingungan.
 try:
-    ffmpeg_path = os.path.abspath("C:\Users\willi\Projects\video-clip-ai-capstone\ffmpeg\ffmpeg-2025-06-28-git-cfd1f81e7d-full_build\bin")
+    ffmpeg_path = os.path.abspath("ffmpeg/ffmpeg-2025-06-28-git-cfd1f81e7d-full_build/bin/ffmpeg.exe")
     if not os.path.exists(ffmpeg_path):
         st.error(f"FFMPEG tidak ditemukan di path: {ffmpeg_path}. Pastikan path sudah benar.")
         st.stop()
     os.environ["IMAGEIO_FFMPEG_EXE"] = ffmpeg_path
 except Exception as e:
     st.error(f"Terjadi masalah saat mengatur path FFMPEG: {e}")
-    st.info("Pastikan Anda sudah mengunduh FFMPEG dan meletakkannya di folder yang benar sesuai petunjuk di kode.")
+    st.info("Pastikan Anda sudah mengunduh FFMPEG dan meletakkannya di folder yang benar.")
     st.stop()
-
 
 # ─── UPLOADER ───
 uploaded = st.file_uploader("Pilih file video:", type=["mp4", "mov", "avi", "mkv"])
+
 if not uploaded:
     st.info("Silakan unggah file video untuk memulai.")
     st.stop()
 
-# Buat file sementara dengan aman
-# Kita menggunakan delete=False agar bisa mendapatkan namanya, lalu akan kita hapus manual di blok finally
+# --- STRATEGI FILE BARU ---
+# Buat path file yang unik di dalam folder sementara kita
 suffix = os.path.splitext(uploaded.name)[1]
-tfile = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+temp_video_path = os.path.join(TEMP_DIR, f"{uuid.uuid4()}{suffix}")
+output_clip_path = None # Inisialisasi variabel path klip output
 
-# Gunakan blok try...finally untuk memastikan file sementara selalu dihapus
 try:
-    # Tulis data dari file yang diunggah ke file sementara
-    tfile.write(uploaded.getbuffer())
-    
-    # --- KUNCI PERBAIKAN ---
-    # Tutup file agar tidak terkunci. Sekarang file aman untuk dibaca oleh proses lain (ffmpeg).
-    tfile.close()
+    # Tulis file yang diunggah ke path baru kita
+    with open(temp_video_path, "wb") as f:
+        f.write(uploaded.getbuffer())
 
-    # Tampilkan video player
-    st.video(tfile.name)
+    # Tampilkan video player dari path yang stabil
+    st.video(temp_video_path)
 
     # ─── ATUR KLIP ───
     st.markdown("---")
     st.markdown("### Atur Klip")
 
-    # Dapatkan durasi video dengan cara yang aman menggunakan 'with'
-    try:
-        with VideoFileClip(tfile.name) as video:
-            duration = video.duration
-    except Exception as e:
-        st.error(f"Gagal membaca durasi video. File mungkin rusak atau format tidak didukung. Error: {e}")
-        st.stop()
+    # Dapatkan durasi video dari path yang stabil
+    with VideoFileClip(temp_video_path) as video:
+        duration = video.duration
 
     col1, col2 = st.columns(2)
     with col1:
         start_time = st.number_input("Mulai dari (detik):", min_value=0.0, max_value=duration, value=0.0, step=0.5)
     with col2:
-        # Maksimum durasi slider adalah sisa durasi dari start_time
         max_clip_duration = duration - start_time
-        default_duration = min(30.0, max_clip_duration) # Default 30 detik atau sisa durasi
+        default_duration = min(30.0, max_clip_duration)
         clip_duration = st.slider("Durasi klip (detik):", 
                                   min_value=1.0, 
                                   max_value=max_clip_duration, 
@@ -77,26 +72,18 @@ try:
 
     if st.button("🚀 Potong, Transkrip, dan Analisa!", type="primary"):
         with st.spinner("Memotong video..."):
-            try:
-                # Potong klip menggunakan 'with' agar sumber daya terbebas otomatis
-                with VideoFileClip(tfile.name) as video:
-                    clip = video.subclip(start_time, end_time)
-                
-                # Simpan klip yang sudah dipotong ke file sementara lainnya
-                out_tmp = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
-                clip.write_videofile(out_tmp.name, codec="libx264", audio_codec="aac", verbose=False, logger=None)
-                clip.close()
-                out_tmp.close() # Tutup file setelah selesai menulis
-
-            except Exception as e:
-                st.error(f"Gagal memotong klip: {e}")
-                st.stop()
+            # Path untuk klip yang sudah dipotong
+            output_clip_path = os.path.join(TEMP_DIR, f"clip_{uuid.uuid4()}.mp4")
+            
+            with VideoFileClip(temp_video_path) as video:
+                clip = video.subclip(start_time, end_time)
+                clip.write_videofile(output_clip_path, codec="libx264", audio_codec="aac", verbose=False, logger=None)
 
         st.success(f"✅ Klip berhasil dibuat: {start_time:.1f}s → {end_time:.1f}s")
         
         # Tampilkan hasil klip dan tombol download
-        st.video(out_tmp.name)
-        with open(out_tmp.name, "rb") as f:
+        st.video(output_clip_path)
+        with open(output_clip_path, "rb") as f:
             st.download_button(
                 "⬇️ Unduh Klip",
                 data=f.read(),
@@ -107,11 +94,11 @@ try:
         # Transkripsi & Viral Score
         with st.spinner("Mentranskrip audio dari klip..."):
             try:
-                transcription_data = transcribe_video(out_tmp.name)
+                transcription_data = transcribe_video(output_clip_path)
                 transcript_text = transcription_data["text"]
             except Exception as e:
                 st.error(f"Gagal mentranskrip video: {e}")
-                transcript_text = "" # Kosongkan jika gagal
+                transcript_text = ""
 
         if transcript_text:
             st.markdown("---")
@@ -121,15 +108,13 @@ try:
             score = estimate_virality(transcript_text)
             st.markdown(f"#### 📈 Prediksi Skor Viralitas")
             st.progress(int(score), text=f"**{score}/100**")
-        
-        # Hapus file klip sementara setelah selesai
-        os.remove(out_tmp.name)
-
 
 except Exception as e:
-    st.error(f"Terjadi kesalahan tak terduga: {e}")
+    st.error(f"Gagal memproses video. File mungkin rusak atau format tidak didukung. Error: {e}")
 
 finally:
-    # Pastikan file sementara dari video asli selalu dihapus
-    if os.path.exists(tfile.name):
-        os.remove(tfile.name)
+    # Pastikan semua file sementara dihapus
+    if os.path.exists(temp_video_path):
+        os.remove(temp_video_path)
+    if output_clip_path and os.path.exists(output_clip_path):
+        os.remove(output_clip_path)
