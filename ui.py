@@ -1,6 +1,6 @@
 import os
 import streamlit as st
-from moviepy.editor import VideoFileClip
+from moviepy.video.io.VideoFileClip import VideoFileClip
 from utils import transcribe_video, estimate_virality
 import uuid
 import logging
